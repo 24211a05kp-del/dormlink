@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import { Heart, Smile } from 'lucide-react';
+import { Heart, Smile, Loader2 } from 'lucide-react';
+import { moodService, MoodEntry } from '@/services/moodService';
+import { useAuth } from '@/context/AuthContext';
+import { format } from 'date-fns';
 
 const moodOptions = [
     { emoji: '😫', label: 'Terrible', color: 'bg-red-50 hover:bg-red-100 border-red-100' },
@@ -13,32 +16,61 @@ const moodOptions = [
     { emoji: '🤩', label: 'Amazing', color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-100' }
 ];
 
-const weeklyMoods = [
-    { day: 'Mon', mood: '😊', color: 'bg-green-50 border-green-100' },
-    { day: 'Tue', mood: '😐', color: 'bg-yellow-50 border-yellow-100' },
-    { day: 'Wed', mood: '😄', color: 'bg-green-50 border-green-100' },
-    { day: 'Thu', mood: '🙂', color: 'bg-lime-50 border-lime-100' },
-    { day: 'Fri', mood: '😫', color: 'bg-red-50 border-red-100' },
-    { day: 'Sat', mood: '🤩', color: 'bg-emerald-50 border-emerald-100' },
-    { day: 'Today', mood: '?', color: 'bg-[#F5EFE6] border-[#EADFCC]' }
-];
-
 interface MoodBoardProps {
     userName: string;
 }
 
 export function MoodBoard({ userName }: MoodBoardProps) {
+    const { user } = useAuth();
     const [selectedMood, setSelectedMood] = useState<string | null>(null);
     const [note, setNote] = useState('');
     const [submitted, setSubmitted] = useState(false);
+    const [history, setHistory] = useState<(MoodEntry & { id: string })[]>([]);
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = () => {
-        setSubmitted(true);
-        setTimeout(() => {
-            setSubmitted(false);
-            setSelectedMood(null);
-            setNote('');
-        }, 3000);
+    useEffect(() => {
+        if (user) {
+            fetchHistory();
+            checkTodayMood();
+        }
+    }, [user]);
+
+    const checkTodayMood = async () => {
+        if (!user) return;
+        const todayMood = await moodService.getTodayMood(user.uid);
+        if (todayMood) {
+            setSelectedMood(todayMood.mood);
+            setNote(todayMood.note || '');
+            setSubmitted(true);
+        }
+    };
+
+    const fetchHistory = async () => {
+        if (!user) return;
+        const data = await moodService.getRecentMoods(user.uid);
+        // Cast to correct type since service returns strictly typed array now
+        setHistory(data as any);
+    };
+
+    const handleSubmit = async () => {
+        if (!user || !selectedMood) return;
+
+        setLoading(true);
+        try {
+            await moodService.saveMood(user.uid, userName || 'Student', selectedMood, note);
+            setSubmitted(true);
+            await fetchHistory();
+            // Don't auto-clear for now, as requirements say "Allow updating it". 
+            // Better to leave it selected so they know what they submitted.
+        } catch (error) {
+            console.error("Failed to save mood", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getEmoji = (label: string) => {
+        return moodOptions.find(m => m.label === label)?.emoji || '😐';
     };
 
     return (
@@ -54,10 +86,23 @@ export function MoodBoard({ userName }: MoodBoardProps) {
             </div>
 
             {/* Greeting */}
-            <div className="mb-8 p-6 bg-gradient-to-r from-[#F5EFE6] to-[#EADFCC]/30 rounded-[1.5rem] border border-[#EADFCC]">
+            <div className="mb-8 p-6 bg-gradient-to-r from-[#F5EFE6] to-[#EADFCC]/30 rounded-[1.5rem] border border-[#EADFCC] flex justify-between items-center">
                 <p className="text-xl text-[#6B4F3A] font-medium">
                     Hey <span className="text-[#5A3A1E] font-bold">{userName}</span>, how have you been today?
                 </p>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                        if (user) {
+                            await moodService.seedFakeHistory(user.uid, userName || 'Student');
+                            fetchHistory();
+                        }
+                    }}
+                    className="text-xs text-muted-foreground hover:bg-[#EADFCC]/50"
+                >
+                    Seed History
+                </Button>
             </div>
 
             {/* Mood Selection */}
@@ -103,13 +148,14 @@ export function MoodBoard({ userName }: MoodBoardProps) {
             {selectedMood && (
                 <Button
                     onClick={handleSubmit}
-                    disabled={submitted}
+                    disabled={loading}
                     className={`w-full rounded-2xl py-6 font-bold text-lg transition-all mb-8 ${submitted
-                        ? 'bg-green-600 hover:bg-green-600 text-white'
+                        ? 'bg-green-600 hover:bg-green-700 text-white'
                         : 'bg-primary hover:bg-[#3D2614] text-white shadow-lg'
                         }`}
                 >
-                    {submitted ? 'Recorded! Take care ❤️' : 'Save Mood'}
+                    {loading ? <Loader2 className="animate-spin mr-2" /> : null}
+                    {submitted ? 'Update Mood' : 'Save Mood'}
                 </Button>
             )}
 
@@ -117,19 +163,25 @@ export function MoodBoard({ userName }: MoodBoardProps) {
             <div className="mt-4 pt-8 border-t border-[#F5EFE6]">
                 <h3 className="mb-6 flex items-center gap-2 text-[#5A3A1E] font-bold">
                     <Smile className="h-5 w-5 text-primary" />
-                    Your Week at a Glance
+                    Your Recent Mood History
                 </h3>
-                <div className="flex gap-2 justify-between overflow-x-auto pb-2">
-                    {weeklyMoods.map((day, index) => (
-                        <div
-                            key={index}
-                            className={`flex flex-col items-center p-3 rounded-2xl border ${day.color} min-w-[60px] flex-shrink-0`}
-                        >
-                            <span className="text-2xl mb-1">{day.mood}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#7A5C3A]">{day.day}</span>
-                        </div>
-                    ))}
-                </div>
+                {history.length > 0 ? (
+                    <div className="flex gap-2 justify-start overflow-x-auto pb-2">
+                        {history.map((entry) => (
+                            <div
+                                key={entry.id}
+                                className={`flex flex-col items-center p-3 rounded-2xl border bg-[#F5EFE6] border-[#EADFCC] min-w-[70px] flex-shrink-0`}
+                            >
+                                <span className="text-2xl mb-1">{getEmoji(entry.mood)}</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[#7A5C3A]">
+                                    {entry.timestamp?.toDate ? format(entry.timestamp.toDate(), 'EEE') : '...'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground italic">No mood history yet.</p>
+                )}
             </div>
         </Card>
     );

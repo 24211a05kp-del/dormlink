@@ -1,31 +1,53 @@
 import { db } from "../firebase/config";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, query, onSnapshot, updateDoc, doc, serverTimestamp, orderBy } from "firebase/firestore";
 
-export interface IssueData {
-    category: string;
-    priority: "low" | "medium" | "high";
+export interface Issue {
+    id: string;
+    studentId: string; // Changed from uid
+    studentName: string;
     hostelBlock: string;
     roomNumber: string;
+    issueCategory: string; // Changed from category
     description: string;
-    studentName: string;
-    // We can add userId here later when we pull it from auth context
-    userId?: string;
-    image?: string; // Storing as base64 string for now, or URL if upload implemented
-    status: "pending" | "in-progress" | "resolved";
+    priority: 'low' | 'medium' | 'high';
+    imageUrl?: string; // Changed from image
+    status: 'open' | 'in_progress' | 'resolved'; // Changed to match "OPEN", "IN_PROGRESS", "RESOLVED" if needed, but requirements said "Open", "In Progress", "Resolved" in one place and "open" in another. I will stick to "open" as initial status requirement, but let's look at the requirement "Open / In Progress / Resolved" for display. I'll use lowercase for DB storage "open", "in_progress", "resolved" for consistency, or human readable if preferred. The prompt says: 'status = "open"' on save. And 'Status (Open / In Progress / Resolved)' for display.
+    createdAt: any;
+    adminRemarks?: string;
+    statusUpdatedBy?: string;
+    statusUpdatedAt?: any;
 }
 
 export const issueService = {
-    addIssue: async (data: Omit<IssueData, "status">) => {
-        try {
-            const docRef = await addDoc(collection(db, "issues"), {
-                ...data,
-                status: "pending",
-                createdAt: serverTimestamp(),
-            });
-            return docRef.id;
-        } catch (error) {
-            console.error("Error adding document: ", error);
-            throw error;
-        }
+    addIssue: async (data: Omit<Issue, 'id' | 'status' | 'createdAt'>) => {
+        const docRef = await addDoc(collection(db, "reported_issues"), {
+            ...data,
+            status: 'open',
+            createdAt: serverTimestamp()
+        });
+        return docRef.id;
     },
+
+    subscribeToIssues: (callback: (issues: Issue[]) => void) => {
+        const q = query(collection(db, "reported_issues"), orderBy("createdAt", "desc"));
+        return onSnapshot(q, (snapshot) => {
+            const issues = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as Issue));
+            callback(issues);
+        });
+    },
+
+    updateStatus: async (id: string, status: Issue['status'], facultyId: string) => {
+        await updateDoc(doc(db, "reported_issues", id), {
+            status,
+            statusUpdatedBy: facultyId,
+            statusUpdatedAt: serverTimestamp()
+        });
+    },
+
+    addRemark: async (id: string, adminRemarks: string) => {
+        await updateDoc(doc(db, "reported_issues", id), { adminRemarks });
+    }
 };

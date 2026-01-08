@@ -1,13 +1,11 @@
-"use client";
+
 
 import { motion } from "framer-motion";
 
-interface LandingPageProps {
-    onStudentLogin: () => void;
-    onFacultyLogin: () => void;
-}
+import { useNavigate } from "react-router-dom";
 
-export const LandingPage = ({ onStudentLogin, onFacultyLogin }: LandingPageProps) => {
+export const LandingPage = () => {
+    const navigate = useNavigate();
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#F5EFE6]">
             <motion.div
@@ -41,14 +39,14 @@ export const LandingPage = ({ onStudentLogin, onFacultyLogin }: LandingPageProps
                 {/* Buttons */}
                 <div className="flex gap-4 justify-center">
                     <button
-                        onClick={onStudentLogin}
+                        onClick={() => navigate('/auth/student')}
                         className="px-6 py-3 rounded-xl bg-[#5A3A1E] text-white font-medium shadow-md hover:scale-105 transition active:scale-95"
                     >
                         Student Login
                     </button>
 
                     <button
-                        onClick={onFacultyLogin}
+                        onClick={() => navigate('/auth/faculty')}
                         className="px-6 py-3 rounded-xl border-2 border-[#5A3A1E] text-[#5A3A1E] font-medium hover:bg-[#EADFCC] transition active:scale-95"
                     >
                         Faculty Login

@@ -3,42 +3,18 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Calendar, Bookmark, MapPin, Users, Loader2 } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { eventService, EventData } from '@/services/eventService';
+import { widgetService, Event } from '@/services/widgetService';
 
 export function EventsAndClubs() {
-    const [events, setEvents] = useState<EventData[]>([]);
+    const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchEvents = async () => {
-            try {
-                const data = await eventService.getEvents();
-                if (data.length > 0) {
-                    setEvents(data);
-                } else {
-                    // Fallback mock data if DB is empty for demo purposes
-                    setEvents([
-                        {
-                            id: '1',
-                            title: 'Tech Fest 2025',
-                            date: 'Jan 15-17, 2025',
-                            time: '9:00 AM onwards',
-                            location: 'Main Auditorium',
-                            category: 'Technology',
-                            attendees: 450,
-                            saved: false,
-                            color: 'from-primary to-primary/70'
-                        }
-                    ]);
-                }
-            } catch (error) {
-                console.error("Failed to load events");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchEvents();
+        const unsubscribe = widgetService.subscribeToEvents((data) => {
+            setEvents(data as any);
+            setLoading(false);
+        });
+        return () => unsubscribe();
     }, []);
 
     if (loading) {

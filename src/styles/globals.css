@@ -20,6 +20,7 @@
   --card-foreground: #6B4F3A;
   --popover: #ffffff;
   --popover-foreground: #6B4F3A;
+  --radius: 1rem;
 }
 
 .dark {
@@ -68,6 +69,11 @@
   --color-chart-4: #BD9C7A;
   --color-chart-5: #DEC09A;
 
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
   @keyframes accordion-down {
     from {
       height: 0;
@@ -100,4 +106,18 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-150%) skewX(-15deg);
+  }
+
+  to {
+    transform: translateX(150%) skewX(-15deg);
+  }
+}
+
+.perspective-1000 {
+  perspective: 1000px;
 }

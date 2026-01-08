@@ -4,8 +4,8 @@ import {
     createUserWithEmailAndPassword,
     signOut as firebaseSignOut,
     updateProfile,
-    User as FirebaseUser
 } from "firebase/auth";
+import { userService, UserProfile } from "./userService";
 
 export interface AppUser {
     uid: string;
@@ -14,39 +14,60 @@ export interface AppUser {
     role: "student" | "faculty";
 }
 
-// Helper to map Firebase User to local user shape
-// Note: We're storing role in localStorage for now as a simple solution. 
-// Ideally this would come from Firestore user document.
-const mapUser = (user: FirebaseUser, role: "student" | "faculty"): AppUser => ({
-    uid: user.uid,
-    displayName: user.displayName,
-    email: user.email,
-    role
-});
-
 export const authService = {
-    login: async (email: string, pass: string, role: "student" | "faculty") => {
+    login: async (email: string, pass: string, role: "student" | "faculty"): Promise<AppUser> => {
         const result = await signInWithEmailAndPassword(auth, email, pass);
-        // Persist role preference
-        localStorage.setItem("userRole", role);
-        return mapUser(result.user, role);
+        let profile = await userService.getUserProfile(result.user.uid);
+
+        if (!profile) {
+            // Profile missing in Firestore? Create it using Auth info and requested role
+            const name = result.user.displayName || email.split('@')[0];
+            await userService.createUserProfile(result.user.uid, {
+                name,
+                email,
+                role
+            });
+            return {
+                uid: result.user.uid,
+                displayName: name,
+                email: result.user.email,
+                role
+            };
+        }
+
+        if (profile.role !== role) {
+            // Logout if role mismatch to prevent unauthorized access to dashboards
+            await firebaseSignOut(auth);
+            throw new Error(`Unauthorized: You are registered as ${profile.role}, not ${role}.`);
+        }
+
+        return {
+            uid: result.user.uid,
+            displayName: profile.name || result.user.displayName,
+            email: result.user.email,
+            role: profile.role
+        };
     },
 
-    signup: async (email: string, pass: string, name: string, role: "student" | "faculty") => {
+    signup: async (email: string, pass: string, name: string, role: "student" | "faculty"): Promise<AppUser> => {
         const result = await createUserWithEmailAndPassword(auth, email, pass);
         if (result.user) {
             await updateProfile(result.user, { displayName: name });
-            localStorage.setItem("userRole", role);
+            await userService.createUserProfile(result.user.uid, {
+                name,
+                email,
+                role
+            });
         }
-        return mapUser(result.user, role);
+        return {
+            uid: result.user.uid,
+            displayName: name,
+            email: result.user.email,
+            role
+        };
     },
 
     logout: async () => {
         await firebaseSignOut(auth);
-        localStorage.removeItem("userRole");
-    },
-
-    getCurrentRole: (): "student" | "faculty" => {
-        return (localStorage.getItem("userRole") as "student" | "faculty") || "student";
     }
 };

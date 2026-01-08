@@ -40,13 +40,13 @@ export function IssuesModule({ userName }: IssuesModuleProps) {
 
                 <TabsContent value="report">
                     <div className="max-w-2xl">
-                        <ReportIssueForm userName={userName} />
+                        <ReportIssueForm />
                     </div>
                 </TabsContent>
 
                 <TabsContent value="my-issues">
                     <div className="max-w-3xl">
-                        <MyIssuesList userName={userName} />
+                        <MyIssuesList />
                     </div>
                 </TabsContent>
             </Tabs>

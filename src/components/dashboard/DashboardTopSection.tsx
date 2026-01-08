@@ -1,9 +1,10 @@
-"use client";
 
+import { useState, useEffect } from 'react';
 import { HorizontalScroll } from './HorizontalScroll';
 import { Card } from '../ui/card';
 import { Calendar, Lightbulb, CheckCircle2, MessageSquare } from 'lucide-react';
 import { Button } from '../ui/button';
+import { widgetService, Thought, Event } from '@/services/widgetService';
 
 interface DashboardTopSectionProps {
     userName: string;
@@ -12,6 +13,18 @@ interface DashboardTopSectionProps {
 }
 
 export function DashboardTopSection({ userName, onFeedbackClick, onSupportClick }: DashboardTopSectionProps) {
+    const [thought, setThought] = useState<Thought | null>(null);
+    const [events, setEvents] = useState<Event[]>([]);
+
+    useEffect(() => {
+        const unsubThought = widgetService.subscribeToLatestThought(setThought);
+        const unsubEvents = widgetService.subscribeToEvents(setEvents);
+        return () => {
+            unsubThought();
+            unsubEvents();
+        };
+    }, []);
+
     const today = new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
@@ -25,7 +38,7 @@ export function DashboardTopSection({ userName, onFeedbackClick, onSupportClick 
                 {/* Thought of the Day */}
                 <div className="w-screen flex-shrink-0 snap-start">
                     <Card
-                        className="w-full h-[350px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-orange-50 to-amber-50 shadow-sm"
+                        className="w-full h-[400px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-orange-50 to-amber-50 shadow-sm"
                     >
                         <div className="max-w-4xl mx-auto text-center">
                             <div className="flex flex-col items-center gap-3 mb-6">
@@ -38,37 +51,62 @@ export function DashboardTopSection({ userName, onFeedbackClick, onSupportClick 
                                 </div>
                             </div>
                             <blockquote className="text-foreground/90 italic mb-6 text-2xl sm:text-4xl font-serif">
-                                "Every accomplishment starts with the decision to try."
+                                "{thought?.text || "Every accomplishment starts with the decision to try."}"
                             </blockquote>
-                            <p className="text-lg text-muted-foreground font-medium">— John F. Kennedy</p>
+                            <p className="text-lg text-muted-foreground font-medium">— {thought?.author || "John F. Kennedy"}</p>
                         </div>
                     </Card>
                 </div>
 
-                {/* Upcoming Event */}
-                <div className="w-screen flex-shrink-0 snap-start">
-                    <Card
-                        className="w-full h-[350px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-sm"
-                    >
-                        <div className="max-w-4xl mx-auto text-center">
-                            <div className="flex flex-col items-center gap-3 mb-6">
-                                <div className="bg-white/20 p-4 rounded-full">
-                                    <Calendar className="h-8 w-8 text-white" />
+                {/* Latest Event */}
+                {events.length > 0 ? (
+                    events.slice(0, 1).map(event => (
+                        <div key={event.id} className="w-screen flex-shrink-0 snap-start">
+                            <Card
+                                className="w-full h-[400px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-sm"
+                            >
+                                <div className="max-w-4xl mx-auto text-center">
+                                    <div className="flex flex-col items-center gap-3 mb-6">
+                                        <div className="bg-white/20 p-4 rounded-full">
+                                            <Calendar className="h-8 w-8 text-white" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold text-xl">Upcoming Event</h3>
+                                            <p className="text-sm text-white/80">{event.date}</p>
+                                        </div>
+                                    </div>
+                                    <h2 className="text-4xl sm:text-6xl font-bold mb-4">{event.title}</h2>
+                                    <p className="text-xl sm:text-2xl text-white/90">{event.description}</p>
+                                    <p className="text-lg mt-4 text-white/80">{event.location} • {event.time}</p>
                                 </div>
-                                <div>
-                                    <h3 className="text-white font-bold text-xl">Upcoming Event</h3>
-                                    <p className="text-sm text-white/80">Jan 15-17</p>
-                                </div>
-                            </div>
-                            <h2 className="text-4xl sm:text-6xl font-bold mb-4">Tech Fest 2025</h2>
-                            <p className="text-xl sm:text-2xl text-white/90">Annual technology festival with competitions, workshops, and exhibitions</p>
+                            </Card>
                         </div>
-                    </Card>
-                </div>
+                    ))
+                ) : (
+                    <div className="w-screen flex-shrink-0 snap-start">
+                        <Card
+                            className="w-full h-[400px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-sm"
+                        >
+                            <div className="max-w-4xl mx-auto text-center">
+                                <div className="flex flex-col items-center gap-3 mb-6">
+                                    <div className="bg-white/20 p-4 rounded-full">
+                                        <Calendar className="h-8 w-8 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-bold text-xl">No Events</h3>
+                                        <p className="text-sm text-white/80">Stay tuned</p>
+                                    </div>
+                                </div>
+                                <h2 className="text-4xl sm:text-6xl font-bold mb-4">New Events Soon</h2>
+                                <p className="text-xl sm:text-2xl text-white/90">Check back later for exciting campus activities!</p>
+                            </div>
+                        </Card>
+                    </div>
+                )}
 
                 {/* Food Feedback Prompt */}
                 <div className="w-screen flex-shrink-0 snap-start">
-                    <Card className="w-full h-[350px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-orange-50 to-orange-100 shadow-sm">
+                    <Card className="w-full h-[400px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-orange-50 to-orange-100 shadow-sm">
                         <div className="max-w-4xl mx-auto text-center">
                             <div className="flex flex-col items-center gap-3 mb-6">
                                 <div className="bg-orange-500 p-4 rounded-full">
@@ -80,14 +118,14 @@ export function DashboardTopSection({ userName, onFeedbackClick, onSupportClick 
                                 </div>
                             </div>
                             <p className="text-3xl sm:text-4xl text-orange-900 mb-8 font-medium">
-                                Did you give today's food feedback?
+                                Share your thoughts on today's meals
                             </p>
                             <Button
                                 onClick={onFeedbackClick}
                                 size="lg"
                                 className="bg-orange-500 hover:bg-orange-600 text-white rounded-full px-12 py-8 text-xl shadow-lg hover:shadow-xl transition-all"
                             >
-                                Share Feedback
+                                Give Feedback
                             </Button>
                         </div>
                     </Card>
@@ -95,27 +133,27 @@ export function DashboardTopSection({ userName, onFeedbackClick, onSupportClick 
 
                 {/* Issues/Support Card */}
                 <div className="w-screen flex-shrink-0 snap-start">
-                    <Card className="w-full h-[350px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-blue-50 to-blue-100 shadow-sm">
+                    <Card className="w-full h-[400px] flex items-center justify-center rounded-none border-x-0 border-t-0 p-6 sm:p-12 bg-gradient-to-r from-blue-50 to-blue-100 shadow-sm">
                         <div className="max-w-4xl mx-auto text-center">
                             <div className="flex flex-col items-center gap-3 mb-6">
                                 <div className="bg-blue-500 p-4 rounded-full">
                                     <MessageSquare className="h-8 w-8 text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="text-blue-900 font-bold text-xl">Need Help?</h3>
+                                    <h3 className="text-blue-900 font-bold text-xl">Need Support?</h3>
                                     <p className="text-sm text-blue-700">We're here for you</p>
                                 </div>
                             </div>
                             <p className="text-3xl sm:text-4xl text-blue-900 mb-8 font-medium">
-                                Do you face any issues?
+                                facing any issues in your room or hostel?
                             </p>
                             <Button
                                 onClick={onSupportClick}
                                 variant="outline"
                                 size="lg"
-                                className="border-blue-500 text-blue-700 hover:bg-blue-500 hover:text-white rounded-full px-12 py-8 text-xl border-2"
+                                className="border-blue-500 text-blue-700 hover:bg-blue-500 hover:text-white rounded-full px-12 py-8 text-xl border-2 shadow-lg"
                             >
-                                Report an Issue
+                                Raise Ticket
                             </Button>
                         </div>
                     </Card>

@@ -22,6 +22,7 @@ describe('Issue Service', () => {
     describe('addIssue', () => {
         it('calls addDoc with correct data', async () => {
             const mockIssueData = {
+                uid: 'test-uid',
                 category: 'Maintenance',
                 priority: 'high' as const,
                 hostelBlock: 'A',
@@ -38,13 +39,14 @@ describe('Issue Service', () => {
             expect(collection).toHaveBeenCalled();
             expect(addDoc).toHaveBeenCalledWith(undefined, expect.objectContaining({
                 ...mockIssueData,
-                status: 'pending',
+                status: 'Pending',
             }));
             expect(result).toBe('new-issue-id');
         });
 
         it('throws error when addDoc fails', async () => {
             const mockIssueData = {
+                uid: 'test-uid',
                 category: 'Maintenance',
                 priority: 'low' as const,
                 hostelBlock: 'B',

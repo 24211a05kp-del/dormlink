@@ -2,25 +2,43 @@ import { useIssues } from '@/utils/issueStore';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Clock, CheckCircle2, AlertTriangle, MapPin } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
-interface MyIssuesListProps {
-    userName: string;
-}
+export function MyIssuesList() {
+    const { user } = useAuth();
+    const { issues, loading } = useIssues();
+    const myIssues = issues.filter(issue => issue.studentId === user?.uid);
 
-export function MyIssuesList({ userName }: MyIssuesListProps) {
-    const { issues } = useIssues();
+    const formatDate = (timestamp: any) => {
+        if (!timestamp) return '...';
+        if (timestamp.toDate) return timestamp.toDate().toLocaleDateString();
+        return new Date(timestamp).toLocaleDateString();
+    };
 
-    // In a real app, we'd filter by user ID. Here we filter by name for demo purposes.
-    // If userName is generic/empty (like initially), show all for demo visibility, 
-    // or strictly filter. Let's strictly filter to simulate reality, assuming ReportForm uses same name.
-    const myIssues = issues.filter(issue => issue.studentName === userName);
+    if (loading) {
+        return (
+            <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-sm text-muted-foreground">Loading your reports...</p>
+            </div>
+        );
+    }
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'Pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            case 'In Progress': return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'Resolved': return 'bg-green-100 text-green-800 border-green-200';
+            case 'open': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200';
+            case 'resolved': return 'bg-green-100 text-green-800 border-green-200';
             default: return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'open': return 'Open';
+            case 'in_progress': return 'In Progress';
+            case 'resolved': return 'Resolved';
+            default: return status;
         }
     };
 
@@ -49,9 +67,9 @@ export function MyIssuesList({ userName }: MyIssuesListProps) {
                 <Card key={issue.id} className="p-5 overflow-hidden transition-all hover:shadow-md border-border">
                     <div className="flex flex-col sm:flex-row gap-4">
                         {/* Image Thumbnail */}
-                        {issue.image ? (
+                        {issue.imageUrl ? (
                             <div className="w-full sm:w-24 h-24 flex-shrink-0 bg-muted rounded-lg overflow-hidden">
-                                <img src={issue.image} alt="Issue" className="w-full h-full object-cover" />
+                                <img src={issue.imageUrl} alt="Issue" className="w-full h-full object-cover" />
                             </div>
                         ) : (
                             <div className="w-full sm:w-24 h-24 flex-shrink-0 bg-primary/5 rounded-lg flex items-center justify-center">
@@ -63,14 +81,14 @@ export function MyIssuesList({ userName }: MyIssuesListProps) {
                             <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <Badge variant="outline" className="text-primary border-primary/20">{issue.category}</Badge>
-                                        <span className="text-xs text-muted-foreground">{issue.date}</span>
+                                        <Badge variant="outline" className="text-primary border-primary/20">{issue.issueCategory}</Badge>
+                                        <span className="text-xs text-muted-foreground">{formatDate(issue.createdAt)}</span>
                                     </div>
                                     <h3 className="font-bold text-lg text-foreground line-clamp-1">{issue.description}</h3>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
                                     <Badge className={`${getStatusColor(issue.status)} border px-3`}>
-                                        {issue.status}
+                                        {getStatusLabel(issue.status)}
                                     </Badge>
                                     {getPriorityBadge(issue.priority)}
                                 </div>

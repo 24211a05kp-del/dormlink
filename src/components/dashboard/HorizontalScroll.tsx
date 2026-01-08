@@ -1,4 +1,4 @@
-"use client";
+
 
 import { useRef, ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';

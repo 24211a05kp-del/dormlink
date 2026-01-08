@@ -8,49 +8,83 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { AlertCircle, Upload, CheckCircle2 } from 'lucide-react';
-import { useIssues, Issue } from '@/utils/issueStore';
-import { issueService } from '@/services/issueService';
+import { useIssues } from '@/utils/issueStore';
+import { issueService, Issue } from '@/services/issueService';
+import { useAuth } from '@/context/AuthContext';
+import { storage } from '@/firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface ReportIssueFormProps {
-    userName: string;
     onSuccess?: () => void;
 }
 
-export function ReportIssueForm({ userName, onSuccess }: ReportIssueFormProps) {
-    const { addIssue } = useIssues();
+export function ReportIssueForm({ onSuccess }: ReportIssueFormProps) {
+    const { user } = useAuth();
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
-    const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<Omit<Issue, 'id' | 'date' | 'status' | 'adminRemarks'>>();
+    const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<Omit<Issue, 'id' | 'createdAt' | 'status' | 'adminRemarks' | 'studentId' | 'studentName'>>();
 
     const onSubmit = async (data: any) => {
+        console.log("Form submission triggered", data);
+        setSubmitError(null);
+
+        if (!user) {
+            console.error("No user found in auth context");
+            setSubmitError("You must be logged in to submit an issue.");
+            return;
+        }
         setSubmitting(true);
         try {
-            await issueService.addIssue({
+            let downloadUrl = undefined;
+            if (selectedFile) {
+                console.log("Uploading file...", selectedFile.name);
+                const storageRef = ref(storage, `issues/${user.uid}/${Date.now()}_${selectedFile.name}`);
+                const snapshot = await uploadBytes(storageRef, selectedFile);
+                downloadUrl = await getDownloadURL(snapshot.ref);
+                console.log("File uploaded, URL:", downloadUrl);
+            }
+
+            console.log("Saving issue to Firestore...");
+
+            const issueData = {
                 ...data,
-                studentName: userName,
-                image: imagePreview || undefined
-            });
+                studentId: user.uid,
+                studentName: user.displayName || 'Student',
+                ...(downloadUrl && { imageUrl: downloadUrl })
+            };
+
+            await issueService.addIssue(issueData);
+            console.log("Issue saved successfully!");
 
             setSubmitting(false);
             setSuccess(true);
             reset();
             setImagePreview(null);
+            setSelectedFile(null);
 
             if (onSuccess) {
                 setTimeout(onSuccess, 2000);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to submit issue", error);
             setSubmitting(false);
-            // Ideally show an error toast here
+            setSubmitError(`Failed to submit: ${error.message || 'Unknown error'}`);
         }
+    };
+
+    const onError = (errors: any) => {
+        console.error("Form validation failed", errors);
+        setSubmitError("Please check the form for errors.");
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setSelectedFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
                 setImagePreview(reader.result as string);
@@ -81,12 +115,18 @@ export function ReportIssueForm({ userName, onSuccess }: ReportIssueFormProps) {
                 <p className="text-muted-foreground">Fill in the details below to report a maintenance or facility issue.</p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-6">
+                {submitError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        {submitError}
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Category */}
                     <div className="space-y-2">
-                        <Label htmlFor="category">Issue Category</Label>
-                        <Select onValueChange={(val) => setValue('category', val as any)} required>
+                        <Label htmlFor="issueCategory">Issue Category</Label>
+                        <Select onValueChange={(val) => setValue('issueCategory', val as any)} required>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select Category" />
                             </SelectTrigger>
@@ -151,6 +191,20 @@ export function ReportIssueForm({ userName, onSuccess }: ReportIssueFormProps) {
                         className="min-h-[120px]"
                     />
                 </div>
+
+                {/* Error Message Display */}
+                {errors.root && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        {errors.root.message}
+                    </div>
+                )}
+                {Object.keys(errors).length > 0 && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        Please fill in all required fields correctly.
+                    </div>
+                )}
 
                 {/* Image Upload */}
                 <div className="space-y-2">

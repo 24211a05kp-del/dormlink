@@ -1,17 +1,17 @@
-"use client";
+
 
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Loader2 } from "lucide-react";
-
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 interface AuthPageProps {
     role: "student" | "faculty";
-    onBack?: () => void;
 }
 
-export const AuthPage = ({ role, onBack }: AuthPageProps) => {
+export const AuthPage = ({ role }: AuthPageProps) => {
+    const navigate = useNavigate();
     const { login, signup } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [name, setName] = useState("");
@@ -47,18 +47,24 @@ export const AuthPage = ({ role, onBack }: AuthPageProps) => {
                     return;
                 }
 
-                await signup(email, password, name, role);
+                const appUser = await signup(email, password, name, role);
+                navigate(appUser.role === 'student' ? '/student-dashboard' : '/faculty-dashboard');
             } else {
                 if (!email) {
                     setError("Please enter your email");
                     setIsLoading(false);
                     return;
                 }
-                await login(email, password, role);
+                const appUser = await login(email, password, role);
+                navigate(appUser.role === 'student' ? '/student-dashboard' : '/faculty-dashboard');
             }
         } catch (err: any) {
             console.error(err);
-            setError(err.message || "Authentication failed. Please check your credentials.");
+            if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+                setError("Incorrect email or password. If you haven't created an account yet, please Sign Up below.");
+            } else {
+                setError(err.message || "Authentication failed. Please check your credentials.");
+            }
         } finally {
             setIsLoading(false);
         }
@@ -75,7 +81,7 @@ export const AuthPage = ({ role, onBack }: AuthPageProps) => {
                 className="w-full max-w-md bg-white p-8 rounded-[2rem] shadow-xl my-10"
             >
                 <button
-                    onClick={onBack}
+                    onClick={() => navigate("/")}
                     className="flex items-center gap-2 text-[#7A5C3A] hover:text-[#5A3A1E] mb-6 transition-colors group self-start"
                 >
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

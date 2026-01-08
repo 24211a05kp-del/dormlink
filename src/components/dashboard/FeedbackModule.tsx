@@ -3,6 +3,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Utensils } from 'lucide-react';
 import { feedbackService } from '@/services/feedbackService';
+import { useAuth } from '@/context/AuthContext';
 
 const emojiOptions = [
     { emoji: '😢', label: 'Poor', value: 1 },
@@ -15,10 +16,10 @@ const emojiOptions = [
 const meals = ['Breakfast', 'Lunch', 'Snacks', 'Dinner'];
 
 export function FeedbackModule() {
+    const { user } = useAuth();
     const [selectedMeal, setSelectedMeal] = useState('Lunch');
     const [selectedRating, setSelectedRating] = useState<number | null>(null);
     const [submitted, setSubmitted] = useState(false);
-
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async () => {
@@ -29,9 +30,11 @@ export function FeedbackModule() {
             await feedbackService.submitFeedback({
                 meal: selectedMeal,
                 rating: selectedRating,
-            });
+                studentName: user?.displayName || 'Anonymous',
+                studentId: user?.uid
+            } as any);
             setSubmitted(true);
-            setSelectedRating(null); // Reset rating after submit
+            setSelectedRating(null);
             setTimeout(() => setSubmitted(false), 3000);
         } catch (error) {
             console.error("Failed to submit feedback", error);

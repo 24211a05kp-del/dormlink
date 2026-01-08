@@ -11,7 +11,7 @@ export interface FeedbackData {
 export const feedbackService = {
     submitFeedback: async (data: FeedbackData) => {
         try {
-            await addDoc(collection(db, "feedback"), {
+            await addDoc(collection(db, "feedbacks"), {
                 ...data,
                 createdAt: serverTimestamp(),
             });

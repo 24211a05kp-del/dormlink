@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isStudent() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'student';
+    }
+    
+    function isFaculty() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'faculty';
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isFaculty());
+    }
+
+    // Outing Requests (Digital Pass)
+    match /outing_requests/{requestId} {
+      allow read: if true; 
+      
+      allow create: if isStudent() && request.resource.data.uid == request.auth.uid;
+      
+      allow update: if isFaculty() || 
+                    (isStudent() && resource.data.uid == request.auth.uid) ||
+                    (
+                      // Secure Guardian Approval (Public Update)
+                      resource.data.status == 'requested' &&
+                      request.resource.data.guardianApprovalStatus in ['approved', 'rejected'] &&
+                      // Prevent modification of student data
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.fullReason == resource.data.fullReason &&
+                      // Ensure the token is being invalidated
+                      request.resource.data.guardianApprovalToken == null &&
+                      // Strict field control
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['guardianApprovalStatus', 'guardianApprovedAt', 'status', 'guardianApprovalToken'])
+                    );
+    }
+
+    // Feedbacks
+    match /feedbacks/{feedbackId} {
+      allow read: if isSignedIn();
+      allow create: if isStudent();
+      allow update, delete: if isFaculty() || (isStudent() && resource.data.studentId == request.auth.uid);
+    }
+
+    // Issues (Complaints)
+    match /issues/{issueId} {
+      allow read: if isFaculty() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isStudent();
+      allow update: if isFaculty();
+    }
+
+    // Menu
+    match /weekly_menu/{dayId} {
+      allow read: if isSignedIn();
+      allow write: if isFaculty();
+    }
+
+    // Widgets (Thoughts, Events)
+    match /thoughts/{thoughtId} {
+      allow read: if isSignedIn();
+      allow write: if isFaculty();
+    }
+    
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isFaculty();
+    }
+  }
+}

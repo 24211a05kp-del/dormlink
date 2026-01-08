@@ -1,4 +1,4 @@
-"use client";
+
 
 import { Coffee, LogOut, Menu as MenuIcon } from 'lucide-react';
 import { Button } from './ui/button';

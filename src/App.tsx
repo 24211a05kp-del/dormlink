@@ -1,45 +1,18 @@
 import { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { LandingPage } from "./pages/LandingPage";
 import { AuthPage } from "./pages/AuthPage";
 import { StudentDashboard } from "./pages/StudentDashboard";
 import { FacultyDashboard } from "./pages/FacultyDashboard";
+import { GuardianApprovalPage } from "./pages/GuardianApprovalPage";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Loader2 } from "lucide-react";
 
-type Screen =
-    | "landing"
-    | "student-auth"
-    | "faculty-auth"
-    | "student-dashboard"
-    | "faculty-dashboard";
-
-function AppContent() {
+function AnimatedRoutes() {
     const { user, loading, logout } = useAuth();
-    const [currentScreen, setCurrentScreen] = useState<Screen>("landing");
-
-    // Sync screen with auth state
-    useEffect(() => {
-        if (!loading) {
-            if (user) {
-                setCurrentScreen(user.role === "student" ? "student-dashboard" : "faculty-dashboard");
-            } else if (currentScreen.includes("dashboard")) {
-                setCurrentScreen("landing");
-            }
-        }
-    }, [user, loading]);
-
-    const handleStudentLogin = () => {
-        setCurrentScreen("student-auth");
-    };
-
-    const handleFacultyLogin = () => {
-        setCurrentScreen("faculty-auth");
-    };
-
-    const handleBack = () => {
-        setCurrentScreen("landing");
-    };
+    const location = useLocation();
 
     if (loading) {
         return (
@@ -50,84 +23,57 @@ function AppContent() {
     }
 
     return (
-        <div className="min-h-screen">
-            <AnimatePresence mode="wait">
-                {currentScreen === "landing" && !user && (
-                    <motion.div
-                        key="landing"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                    >
-                        <LandingPage
-                            onStudentLogin={handleStudentLogin}
-                            onFacultyLogin={handleFacultyLogin}
-                        />
-                    </motion.div>
-                )}
+        <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+                {/* Public Routes */}
+                <Route path="/" element={
+                    !user ? <LandingPage /> : <Navigate to={user.role === 'student' ? '/student-dashboard' : '/faculty-dashboard'} replace />
+                } />
 
-                {currentScreen === "student-auth" && !user && (
-                    <motion.div
-                        key="student-auth"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                    >
-                        <AuthPage
-                            role="student"
-                            onBack={handleBack}
-                        />
-                    </motion.div>
-                )}
+                <Route path="/auth/student" element={
+                    !user ? <AuthPage role="student" /> : <Navigate to="/student-dashboard" replace />
+                } />
 
-                {currentScreen === "faculty-auth" && !user && (
-                    <motion.div
-                        key="faculty-auth"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                    >
-                        <AuthPage
-                            role="faculty"
-                            onBack={handleBack}
-                        />
-                    </motion.div>
-                )}
+                <Route path="/auth/faculty" element={
+                    !user ? <AuthPage role="faculty" /> : <Navigate to="/faculty-dashboard" replace />
+                } />
 
-                {currentScreen === "student-dashboard" && user?.role === "student" && (
-                    <motion.div
-                        key="student-dashboard"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                    >
-                        <StudentDashboard
-                            userName={user.displayName || "Student"}
-                            onLogout={logout}
-                        />
-                    </motion.div>
-                )}
+                {/* Public Access Route for Guardians */}
+                <Route path="/guardian/approve/:token" element={<GuardianApprovalPage />} />
 
-                {currentScreen === "faculty-dashboard" && user?.role === "faculty" && (
-                    <motion.div
-                        key="faculty-dashboard"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                    >
-                        <FacultyDashboard
-                            userName={user.displayName || "Faculty"}
-                            onLogout={logout}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
+
+                {/* Protected Routes */}
+                <Route path="/student-dashboard" element={
+                    user?.role === "student" ? (
+                        <StudentDashboard userName={user.displayName || "Student"} onLogout={logout} />
+                    ) : (
+                        <Navigate to={user ? "/faculty-dashboard" : "/auth/student"} replace />
+                    )
+                } />
+
+                <Route path="/faculty-dashboard" element={
+                    user?.role === "faculty" ? (
+                        <FacultyDashboard userName={user.displayName || "Faculty"} onLogout={logout} />
+                    ) : (
+                        <Navigate to={user ? "/student-dashboard" : "/auth/faculty"} replace />
+                    )
+                } />
+
+                {/* Catch-all */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        </AnimatePresence>
     );
 }
 
 export default function App() {
     return (
         <AuthProvider>
-            <AppContent />
+            <BrowserRouter>
+                <div className="min-h-screen">
+                    <AnimatedRoutes />
+                </div>
+            </BrowserRouter>
         </AuthProvider>
     );
 }

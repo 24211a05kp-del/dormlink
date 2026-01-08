@@ -5,6 +5,7 @@ import { AlertCircle, MessageSquare, CheckCircle2, Clock, Filter, Search } from 
 import { Badge } from '../ui/badge';
 import { useIssues, Issue } from '@/utils/issueStore';
 import { Textarea } from '../ui/textarea';
+import { useAuth } from '@/context/AuthContext';
 import {
     Dialog,
     DialogContent,
@@ -17,11 +18,26 @@ import {
 import { Input } from '../ui/input';
 
 export function ComplaintManagement() {
-    const { issues, updateStatus, addRemark } = useIssues();
-    const [filter, setFilter] = useState<'all' | 'Pending' | 'In Progress' | 'Resolved'>('all');
+    const { user } = useAuth();
+    const { issues, updateStatus, addRemark, loading } = useIssues();
+    const [filter, setFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
     const [remarkText, setRemarkText] = useState('');
+
+    const formatDate = (timestamp: any) => {
+        if (!timestamp) return '...';
+        if (timestamp.toDate) return timestamp.toDate().toLocaleDateString();
+        return new Date(timestamp).toLocaleDateString();
+    };
+
+    if (loading) {
+        return (
+            <div className="flex justify-center p-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#5A3A1E]"></div>
+            </div>
+        );
+    }
 
     const filteredIssues = issues.filter(issue => {
         const matchesFilter = filter === 'all' || issue.status === filter;
@@ -34,10 +50,19 @@ export function ComplaintManagement() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'Pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-            case 'In Progress': return 'bg-blue-100 text-blue-800 border-blue-300';
-            case 'Resolved': return 'bg-green-100 text-green-800 border-green-300';
+            case 'open': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+            case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-300';
+            case 'resolved': return 'bg-green-100 text-green-800 border-green-300';
             default: return 'bg-gray-100 text-gray-800 border-gray-300';
+        }
+    };
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'open': return 'Open';
+            case 'in_progress': return 'In Progress';
+            case 'resolved': return 'Resolved';
+            default: return status;
         }
     };
 
@@ -46,6 +71,12 @@ export function ComplaintManagement() {
             addRemark(id, remarkText);
             setRemarkText('');
             setSelectedIssue(null); // Close dialog if open
+        }
+    };
+
+    const handleUpdateStatus = (id: string, newStatus: Issue['status']) => {
+        if (user) {
+            updateStatus(id, newStatus, user.uid);
         }
     };
 
@@ -74,7 +105,7 @@ export function ComplaintManagement() {
                         />
                     </div>
                     <div className="flex gap-2 bg-white p-1 rounded-xl border border-[#EADFCC]">
-                        {(['all', 'Pending', 'In Progress', 'Resolved'] as const).map(status => (
+                        {(['all', 'open', 'in_progress', 'resolved'] as const).map(status => (
                             <Button
                                 key={status}
                                 variant={filter === status ? 'default' : 'ghost'}
@@ -82,7 +113,7 @@ export function ComplaintManagement() {
                                 size="sm"
                                 className={`rounded-lg capitalize py-1 h-8 ${filter === status ? 'bg-[#5A3A1E] text-white hover:bg-[#3D2614]' : 'text-[#5A3A1E] hover:bg-[#5A3A1E]/10'}`}
                             >
-                                {status}
+                                {status === 'all' ? 'All' : getStatusLabel(status)}
                             </Button>
                         ))}
                     </div>
@@ -94,21 +125,21 @@ export function ComplaintManagement() {
                 <Card className="p-4 bg-yellow-50 border-yellow-100 flex items-center justify-between">
                     <div>
                         <p className="text-xs font-bold text-yellow-800 uppercase">Pending</p>
-                        <p className="text-2xl font-bold text-yellow-900">{issues.filter(i => i.status === 'Pending').length}</p>
+                        <p className="text-2xl font-bold text-yellow-900">{issues.filter(i => i.status === 'open').length}</p>
                     </div>
                     <Clock className="h-8 w-8 text-yellow-200" />
                 </Card>
                 <Card className="p-4 bg-blue-50 border-blue-100 flex items-center justify-between">
                     <div>
                         <p className="text-xs font-bold text-blue-800 uppercase">In Progress</p>
-                        <p className="text-2xl font-bold text-blue-900">{issues.filter(i => i.status === 'In Progress').length}</p>
+                        <p className="text-2xl font-bold text-blue-900">{issues.filter(i => i.status === 'in_progress').length}</p>
                     </div>
                     <AlertCircle className="h-8 w-8 text-blue-200" />
                 </Card>
                 <Card className="p-4 bg-green-50 border-green-100 flex items-center justify-between">
                     <div>
                         <p className="text-xs font-bold text-green-800 uppercase">Resolved</p>
-                        <p className="text-2xl font-bold text-green-900">{issues.filter(i => i.status === 'Resolved').length}</p>
+                        <p className="text-2xl font-bold text-green-900">{issues.filter(i => i.status === 'resolved').length}</p>
                     </div>
                     <CheckCircle2 className="h-8 w-8 text-green-200" />
                 </Card>
@@ -121,9 +152,9 @@ export function ComplaintManagement() {
                         <div className="flex flex-col md:flex-row gap-6">
 
                             {/* Image Preview */}
-                            {issue.image && (
+                            {issue.imageUrl && (
                                 <div className="w-full md:w-48 h-48 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                                    <img src={issue.image} alt="Issue" className="w-full h-full object-cover" />
+                                    <img src={issue.imageUrl} alt="Issue" className="w-full h-full object-cover" />
                                 </div>
                             )}
 
@@ -132,9 +163,9 @@ export function ComplaintManagement() {
                                     <div>
                                         <div className="flex items-center gap-2 mb-2">
                                             <Badge variant="outline" className="bg-[#EADFCC]/30 text-[#5A3A1E] border-[#EADFCC]">
-                                                {issue.category}
+                                                {issue.issueCategory}
                                             </Badge>
-                                            <span className="text-xs text-[#7A5C3A] font-medium">{issue.date}</span>
+                                            <span className="text-xs text-[#7A5C3A] font-medium">{formatDate(issue.createdAt)}</span>
                                         </div>
                                         <h4 className="text-xl font-bold text-[#5A3A1E] mb-1">{issue.description}</h4>
                                         <div className="flex items-center gap-4 text-sm text-[#6B4F3A]">
@@ -150,7 +181,7 @@ export function ComplaintManagement() {
                                             {issue.priority}
                                         </Badge>
                                         <Badge variant="outline" className={getStatusColor(issue.status)}>
-                                            {issue.status}
+                                            {getStatusLabel(issue.status)}
                                         </Badge>
                                     </div>
                                 </div>
@@ -164,20 +195,20 @@ export function ComplaintManagement() {
                                 )}
 
                                 {/* Action Buttons */}
-                                {issue.status !== 'Resolved' && (
+                                {issue.status !== 'resolved' && (
                                     <div className="flex flex-wrap gap-3 pt-2 border-t border-dashed border-[#EADFCC]">
-                                        {issue.status === 'Pending' && (
+                                        {issue.status === 'open' && (
                                             <Button
-                                                onClick={() => updateStatus(issue.id, 'In Progress')}
+                                                onClick={() => handleUpdateStatus(issue.id, 'in_progress')}
                                                 size="sm"
                                                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                                             >
                                                 Mark In Progress
                                             </Button>
                                         )}
-                                        {issue.status === 'In Progress' && (
+                                        {issue.status === 'in_progress' && (
                                             <Button
-                                                onClick={() => updateStatus(issue.id, 'Resolved')}
+                                                onClick={() => handleUpdateStatus(issue.id, 'resolved')}
                                                 size="sm"
                                                 className="bg-green-600 hover:bg-green-700 text-white rounded-lg"
                                             >
