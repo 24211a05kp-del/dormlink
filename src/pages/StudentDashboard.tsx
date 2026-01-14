@@ -40,20 +40,16 @@ export function StudentDashboard({ userName, onLogout }: StudentDashboardProps) 
         }
     }, [isMounted, authLoading, user]);
 
-    if (authLoading || !isMounted) {
+    // If auth is loading, show a basic centered loader
+    if (authLoading) {
         return (
-            <DashboardLayout userName={userName} role="student" onLogout={onLogout}>
-                <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4 text-center">
-                    <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                    <div>
-                        <p className="text-[#5A3A1E] font-bold text-lg animate-pulse">Initializing Dashboard...</p>
-                        <p className="text-[#7A5C3A] text-sm mt-1">Checking authentication and permissions</p>
-                    </div>
-                </div>
-            </DashboardLayout>
+            <div className="min-h-screen flex items-center justify-center bg-[#F5EFE6]">
+                <Loader2 className="w-10 h-10 animate-spin text-[#5A3A1E]" />
+            </div>
         );
     }
 
+    // Role safety catch: if we made it here but role is mismatched, show error
     if (loadError) {
         return (
             <DashboardLayout userName={userName} role="student" onLogout={onLogout}>

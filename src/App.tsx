@@ -14,6 +14,13 @@ function AnimatedRoutes() {
     const { user, loading, logout } = useAuth();
     const location = useLocation();
 
+    console.log("App Route Log:", {
+        path: location.pathname,
+        userUid: user?.uid,
+        userRole: user?.role,
+        loading
+    });
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#F5EFE6]">
@@ -23,46 +30,43 @@ function AnimatedRoutes() {
     }
 
     return (
-        <AnimatePresence mode="wait">
-            <Routes location={location} key={location.pathname}>
-                {/* Public Routes */}
-                <Route path="/" element={
-                    !user ? <LandingPage /> : <Navigate to={user.role === 'student' ? '/student-dashboard' : '/faculty-dashboard'} replace />
-                } />
+        <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={
+                !user ? <LandingPage /> : <Navigate to={user.role === 'student' ? '/student-dashboard' : '/faculty-dashboard'} replace />
+            } />
 
-                <Route path="/auth/student" element={
-                    !user ? <AuthPage role="student" /> : <Navigate to="/student-dashboard" replace />
-                } />
+            <Route path="/auth/student" element={
+                !user ? <AuthPage role="student" /> : <Navigate to="/student-dashboard" replace />
+            } />
 
-                <Route path="/auth/faculty" element={
-                    !user ? <AuthPage role="faculty" /> : <Navigate to="/faculty-dashboard" replace />
-                } />
+            <Route path="/auth/faculty" element={
+                !user ? <AuthPage role="faculty" /> : <Navigate to="/faculty-dashboard" replace />
+            } />
 
-                {/* Public Access Route for Guardians */}
-                <Route path="/guardian/approve/:token" element={<GuardianApprovalPage />} />
+            {/* Public Access Route for Guardians */}
+            <Route path="/guardian/approve/:token" element={<GuardianApprovalPage />} />
 
+            {/* Protected Routes */}
+            <Route path="/student-dashboard" element={
+                user?.role === "student" ? (
+                    <StudentDashboard userName={user.displayName || "Student"} onLogout={logout} />
+                ) : (
+                    <Navigate to={user?.role === "faculty" ? "/faculty-dashboard" : "/"} replace />
+                )
+            } />
 
-                {/* Protected Routes */}
-                <Route path="/student-dashboard" element={
-                    user?.role === "student" ? (
-                        <StudentDashboard userName={user.displayName || "Student"} onLogout={logout} />
-                    ) : (
-                        <Navigate to={user ? "/faculty-dashboard" : "/auth/student"} replace />
-                    )
-                } />
+            <Route path="/faculty-dashboard" element={
+                user?.role === "faculty" ? (
+                    <FacultyDashboard userName={user.displayName || "Faculty"} onLogout={logout} />
+                ) : (
+                    <Navigate to={user?.role === "student" ? "/student-dashboard" : "/"} replace />
+                )
+            } />
 
-                <Route path="/faculty-dashboard" element={
-                    user?.role === "faculty" ? (
-                        <FacultyDashboard userName={user.displayName || "Faculty"} onLogout={logout} />
-                    ) : (
-                        <Navigate to={user ? "/student-dashboard" : "/auth/faculty"} replace />
-                    )
-                } />
-
-                {/* Catch-all */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-        </AnimatePresence>
+            {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
     );
 }
 

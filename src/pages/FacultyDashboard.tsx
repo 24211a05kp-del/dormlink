@@ -39,13 +39,6 @@ export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
                 console.warn("FacultyDashboard: Role mismatch. Found:", currentRole);
                 setLoadError(`Access Denied: Your role is '${currentRole}', but this is the Faculty Dashboard.`);
             }
-        } else if (!authLoading && !user) {
-            // If authLoading is false but no user, it means user is not logged in
-            // This scenario should ideally be handled by AuthContext redirecting to login
-            // but as a fallback, we can set an error or just let the loading state handle it.
-            console.warn("FacultyDashboard: No user found after auth loading completed.");
-            // Optionally, set an error or redirect if not handled by AuthContext
-            // setLoadError("Access Denied: You are not logged in.");
         }
     }, [authLoading, user]); // Depend on authLoading and user
 
@@ -55,6 +48,41 @@ export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
 
         { label: "Pending Issues", value: "...", icon: ShieldAlert, color: "text-red-600" },
     ]);
+
+    // If auth is loading, show a basic centered loader
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#F5EFE6]">
+                <Loader2 className="w-10 h-10 animate-spin text-[#5A3A1E]" />
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <DashboardLayout userName={userName} role="faculty" onLogout={onLogout}>
+                <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center bg-white rounded-3xl border-2 border-dashed border-red-200 shadow-sm max-w-md mx-auto my-12">
+                    <AlertCircle className="w-16 h-16 text-red-500 mb-6 drop-shadow-sm" />
+                    <h2 className="text-2xl font-black text-gray-800 mb-2">Access Restricted</h2>
+                    <p className="text-gray-600 mb-8 leading-relaxed font-medium">{loadError}</p>
+                    <div className="flex flex-col gap-3 w-full">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="w-full px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:shadow-lg transition-all active:scale-[0.98]"
+                        >
+                            Try Again
+                        </button>
+                        <button
+                            onClick={onLogout}
+                            className="w-full px-6 py-4 bg-[#F5EFE6] text-[#5A3A1E] rounded-2xl font-bold hover:bg-[#EADFCC] transition-all"
+                        >
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     useEffect(() => {
         if (loadError || authLoading || !isMounted) return; // Do not fetch stats if there's an error, still loading auth, or not mounted
