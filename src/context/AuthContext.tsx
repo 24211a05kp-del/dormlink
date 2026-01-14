@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { auth } from "../firebase/config";
+import { auth, db } from '../firebase/config';
 import { authService, AppUser } from "../services/authService";
-import { userService } from "../services/userService";
+import { userService, UserProfile } from "../services/userService";
 
 interface AuthContextType {
     user: AppUser | null;
@@ -16,19 +16,26 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<AppUser | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [authLoading, setAuthLoading] = useState(true);
+    const [manualLoading, setManualLoading] = useState(false);
+
+    const loading = authLoading || manualLoading;
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-            if (firebaseUser) {
-                // If we already have a user in state from login/signup call, don't overwrite it with null
-                // until we try to fetch the profile.
-                try {
-                    const profilePath = `users/${firebaseUser.uid}`;
-                    console.log("AuthContext: Fetching profile for UID:", firebaseUser.uid);
-                    console.log("AuthContext: Firestore Path:", profilePath);
+            console.log("AuthContext: Auth state change detected. UID:", firebaseUser?.uid || "None");
 
-                    const profile = await userService.getUserProfile(firebaseUser.uid);
+            // If we have a user but no profile yet, keep loading
+            if (firebaseUser) {
+                setAuthLoading(true);
+                try {
+                    const profilePromise = userService.getUserProfile(firebaseUser.uid);
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error("Profile timeout")), 5000)
+                    );
+
+                    const profile = await Promise.race([profilePromise, timeoutPromise]) as UserProfile | null;
+
                     if (profile) {
                         setUser({
                             uid: firebaseUser.uid,
@@ -36,38 +43,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             email: firebaseUser.email,
                             role: profile.role
                         });
-                    } else {
-                        // Keep current user state if already set correctly (middle of login)
-                        setUser(prev => (prev && prev.uid === firebaseUser.uid) ? prev : null);
                     }
                 } catch (error: any) {
-                    console.error("AuthContext: Profile fetch error:", error);
-                    setUser(null);
+                    console.error("AuthContext: Profile fetch failure:", error.message);
+                } finally {
+                    setAuthLoading(false);
                 }
             } else {
                 setUser(null);
             }
-            setLoading(false);
+            setAuthLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
 
     const login = async (email: string, pass: string, role: "student" | "faculty") => {
-        const appUser = await authService.login(email, pass, role);
-        setUser(appUser);
-        return appUser;
+        setManualLoading(true);
+        try {
+            const appUser = await authService.login(email, pass, role);
+            setUser(appUser);
+            return appUser;
+        } finally {
+            setManualLoading(false);
+        }
     };
 
     const signup = async (email: string, pass: string, name: string, role: "student" | "faculty") => {
-        const appUser = await authService.signup(email, pass, name, role);
-        setUser(appUser);
-        return appUser;
+        setManualLoading(true);
+        try {
+            const appUser = await authService.signup(email, pass, name, role);
+            setUser(appUser);
+            return appUser;
+        } finally {
+            setManualLoading(false);
+        }
     };
 
     const logout = async () => {
-        await authService.logout();
-        setUser(null);
+        setManualLoading(true);
+        try {
+            await authService.logout();
+            setUser(null);
+        } finally {
+            setManualLoading(false);
+        }
     };
 
     const value = {

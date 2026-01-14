@@ -19,15 +19,20 @@ export interface UserProfile {
 
 export const userService = {
     createUserProfile: async (uid: string, data: Omit<UserProfile, 'uid' | 'createdAt'>) => {
-        // REQUIRED: All user profiles are stored in: users/{uid}
-        await setDoc(doc(db, "users", uid), {
+        if (!uid) throw new Error("UID is required to create a profile");
+
+        // STRICT RULE: All user profiles MUST be stored in: users/{auth.uid}
+        const profileRef = doc(db, "users", uid);
+        await setDoc(profileRef, {
             ...data,
             uid,
             createdAt: serverTimestamp()
         });
+        console.log(`Firestore: Profile created at users/${uid}`);
     },
 
     getUserProfile: async (uid: string): Promise<UserProfile | null> => {
+        if (!uid) return null;
         const path = `users/${uid}`;
         console.log(`Firestore: Fetching document from ${path}`);
         try {

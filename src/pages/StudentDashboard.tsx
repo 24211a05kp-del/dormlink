@@ -18,33 +18,52 @@ interface StudentDashboardProps {
     onLogout: () => void;
 }
 
-export function StudentDashboard({ userName, onLogout }: StudentDashboardProps) {
+export function StudentDashboard(props: StudentDashboardProps) {
+    try {
+        return <StudentDashboardContent {...props} />;
+    } catch (error) {
+        console.error("StudentDashboard crash:", error);
+        return (
+            <DashboardLayout userName={props.userName} role="student" onLogout={props.onLogout}>
+                <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center bg-white rounded-3xl border-2 border-dashed border-red-200 shadow-sm max-w-md mx-auto my-12">
+                    <AlertCircle className="w-16 h-16 text-red-500 mb-6 drop-shadow-sm" />
+                    <h2 className="text-2xl font-black text-gray-800 mb-2">Interface Error</h2>
+                    <p className="text-gray-600 mb-8 leading-relaxed font-medium">
+                        Something went wrong while rendering the dashboard UI.
+                    </p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="w-full px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:shadow-lg transition-all"
+                    >
+                        Reload Interface
+                    </button>
+                </div>
+            </DashboardLayout>
+        );
+    }
+}
+
+function StudentDashboardContent({ userName, onLogout }: StudentDashboardProps) {
     const { user, loading: authLoading } = useAuth();
     const [activeTab, setActiveTab] = useState('overview');
-    const [isMounted, setIsMounted] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
 
+    // Initial check for data availability
     useEffect(() => {
-        setIsMounted(true);
-        const currentRole = user?.role;
-        console.log("StudentDashboard: Mounted, User Role:", currentRole);
-
-        // Safety check: if role is missing or mismatched after mount
-        if (isMounted && !authLoading) {
-            if (!user) {
-                console.warn("StudentDashboard: No user found");
-            } else if (currentRole !== 'student') {
-                console.warn("StudentDashboard: Role mismatch. Found:", currentRole);
-                setLoadError(`Access Denied: Your role is '${currentRole}', but this is the Student Dashboard.`);
-            }
+        if (!authLoading && !user) {
+            setLoadError("Your session could not be verified. Please try logging in again.");
+        } else if (!authLoading && user && user.role !== 'student') {
+            setLoadError(`Access Denied: You are logged in as a ${user.role}.`);
         }
-    }, [isMounted, authLoading, user]);
+    }, [authLoading, user]);
 
-    // If auth is loading, show a basic centered loader
     if (authLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#F5EFE6]">
-                <Loader2 className="w-10 h-10 animate-spin text-[#5A3A1E]" />
+                <div className="text-center space-y-4">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+                    <p className="text-[#5A3A1E] font-bold animate-pulse">Loading Student Dashboard...</p>
+                </div>
             </div>
         );
     }
@@ -90,7 +109,6 @@ export function StudentDashboard({ userName, onLogout }: StudentDashboardProps) 
         { id: 'issues', label: 'Issues', icon: AlertTriangle },
         { id: 'mood', label: 'Mood', icon: Smile },
         { id: 'outing', label: 'Outing', icon: MapPin },
-
         { id: 'lost-found', label: 'Lost & Found', icon: Package },
         { id: 'events', label: 'Events', icon: Calendar },
         { id: 'menu', label: 'Menu', icon: Coffee },
@@ -158,8 +176,6 @@ export function StudentDashboard({ userName, onLogout }: StudentDashboardProps) 
                             <OutingApproval />
                         </div>
                     )}
-
-
 
                     {activeTab === 'lost-found' && (
                         <LostAndFound />

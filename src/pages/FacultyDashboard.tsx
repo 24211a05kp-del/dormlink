@@ -15,37 +15,59 @@ import { useAuth } from '../context/AuthContext';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
-import { db } from '@/firebase/config';
+import { db } from '../firebase/config';
 
-interface DashboardProps {
+interface FacultyDashboardProps {
     userName: string;
     onLogout: () => void;
 }
 
-export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
+export function FacultyDashboard(props: FacultyDashboardProps) {
+    try {
+        return <FacultyDashboardContent {...props} />;
+    } catch (error) {
+        console.error("FacultyDashboard crash:", error);
+        return (
+            <DashboardLayout userName={props.userName} role="faculty" onLogout={props.onLogout}>
+                <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center bg-white rounded-3xl border-2 border-dashed border-red-200 shadow-sm max-w-md mx-auto my-12">
+                    <AlertCircle className="w-16 h-16 text-red-500 mb-6 drop-shadow-sm" />
+                    <h2 className="text-2xl font-black text-gray-800 mb-2">Interface Error</h2>
+                    <p className="text-gray-600 mb-8 leading-relaxed font-medium">
+                        Something went wrong while rendering the faculty dashboard.
+                    </p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="w-full px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:shadow-lg transition-all"
+                    >
+                        Reload Interface
+                    </button>
+                </div>
+            </DashboardLayout>
+        );
+    }
+}
+
+function FacultyDashboardContent({ userName, onLogout }: FacultyDashboardProps) {
     const { user, loading: authLoading } = useAuth();
-    const [isMounted, setIsMounted] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
-        // This effect runs on mount and when authLoading or user changes
-        // We need to check role after authLoading is false and user is available
-        if (!authLoading && user) {
-            const currentRole = user.role;
-            console.log("FacultyDashboard: User Role:", currentRole);
+    }, []);
 
-            if (currentRole !== 'faculty') {
-                console.warn("FacultyDashboard: Role mismatch. Found:", currentRole);
-                setLoadError(`Access Denied: Your role is '${currentRole}', but this is the Faculty Dashboard.`);
-            }
+    // Initial check for data availability
+    useEffect(() => {
+        if (!authLoading && !user) {
+            setLoadError("Your session could not be verified. Please try logging in again.");
+        } else if (!authLoading && user && user.role !== 'faculty') {
+            setLoadError(`Access Denied: You are logged in as a ${user.role}.`);
         }
-    }, [authLoading, user]); // Depend on authLoading and user
+    }, [authLoading, user]);
 
     const [stats, setStats] = useState([
         { label: "Total Students", value: "...", icon: Users, color: "text-blue-600" },
         { label: "Pending Outings", value: "...", icon: ClipboardList, color: "text-orange-600" },
-
         { label: "Pending Issues", value: "...", icon: ShieldAlert, color: "text-red-600" },
     ]);
 
@@ -53,7 +75,10 @@ export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
     if (authLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#F5EFE6]">
-                <Loader2 className="w-10 h-10 animate-spin text-[#5A3A1E]" />
+                <div className="text-center space-y-4">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+                    <p className="text-[#5A3A1E] font-bold animate-pulse">Loading Faculty Dashboard...</p>
+                </div>
             </div>
         );
     }
@@ -189,4 +214,4 @@ export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
             </div>
         </DashboardLayout>
     );
-};
+}
