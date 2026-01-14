@@ -11,6 +11,9 @@ import { SettingsManagement } from "../components/dashboard/SettingsManagement";
 import { EventManagement } from "../components/dashboard/EventManagement";
 import { EventsBoard } from "../components/dashboard/EventsBoard";
 
+import { useAuth } from '../context/AuthContext';
+import { Loader2, AlertCircle } from 'lucide-react';
+
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 
@@ -20,6 +23,32 @@ interface DashboardProps {
 }
 
 export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
+    const { user, loading: authLoading } = useAuth();
+    const [isMounted, setIsMounted] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setIsMounted(true);
+        // This effect runs on mount and when authLoading or user changes
+        // We need to check role after authLoading is false and user is available
+        if (!authLoading && user) {
+            const currentRole = user.role;
+            console.log("FacultyDashboard: User Role:", currentRole);
+
+            if (currentRole !== 'faculty') {
+                console.warn("FacultyDashboard: Role mismatch. Found:", currentRole);
+                setLoadError(`Access Denied: Your role is '${currentRole}', but this is the Faculty Dashboard.`);
+            }
+        } else if (!authLoading && !user) {
+            // If authLoading is false but no user, it means user is not logged in
+            // This scenario should ideally be handled by AuthContext redirecting to login
+            // but as a fallback, we can set an error or just let the loading state handle it.
+            console.warn("FacultyDashboard: No user found after auth loading completed.");
+            // Optionally, set an error or redirect if not handled by AuthContext
+            // setLoadError("Access Denied: You are not logged in.");
+        }
+    }, [authLoading, user]); // Depend on authLoading and user
+
     const [stats, setStats] = useState([
         { label: "Total Students", value: "...", icon: Users, color: "text-blue-600" },
         { label: "Pending Outings", value: "...", icon: ClipboardList, color: "text-orange-600" },
@@ -28,6 +57,8 @@ export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
     ]);
 
     useEffect(() => {
+        if (loadError || authLoading || !isMounted) return; // Do not fetch stats if there's an error, still loading auth, or not mounted
+
         // Students count
         const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
             const studentCount = snap.docs.filter(d => d.data().role === 'student').length;
