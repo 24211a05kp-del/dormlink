@@ -17,18 +17,31 @@ export interface AppUser {
 export const authService = {
     login: async (email: string, pass: string, role: "student" | "faculty"): Promise<AppUser> => {
         const result = await signInWithEmailAndPassword(auth, email, pass);
-        const profile = await userService.getUserProfile(result.user.uid);
+
+        // Ensure auth state is ready
+        if (!auth.currentUser) {
+            throw new Error("Authentication failed: User state not available. Please try again.");
+        }
+
+        let profile;
+        try {
+            profile = await userService.getUserProfile(result.user.uid);
+        } catch (error) {
+            await firebaseSignOut(auth);
+            throw new Error("Failed to access user data. Please check your connection and try again.");
+        }
 
         if (!profile) {
-            // Logout if profile is missing to prevent session persistence without profile
             await firebaseSignOut(auth);
-            throw new Error("User profile not found. Please contact support or Sign Up.");
+            throw new Error("User profile not found. Please sign up again.");
         }
 
         if (profile.role !== role) {
-            // Logout if role mismatch to prevent unauthorized access to dashboards
             await firebaseSignOut(auth);
-            throw new Error(`Unauthorized: You are registered as ${profile.role}, not ${role}.`);
+            const roleError = role === "student"
+                ? "Unauthorized role for student login."
+                : "Unauthorized role for faculty login.";
+            throw new Error(roleError);
         }
 
         return {

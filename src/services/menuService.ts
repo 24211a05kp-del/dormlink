@@ -62,14 +62,18 @@ const initialWeeklyMenu: WeeklyMenu = {
 export const menuService = {
     // Initialize DB with default menu if empty
     initialize: async () => {
-        const checkDoc = await getDoc(doc(db, "dailyMenus", "Monday"));
-        if (!checkDoc.exists()) {
-            console.log("Initializing Menu in Firestore...");
-            for (const day of DAYS) {
-                if (initialWeeklyMenu[day]) {
-                    await setDoc(doc(db, "dailyMenus", day), initialWeeklyMenu[day]);
+        try {
+            const checkDoc = await getDoc(doc(db, "dailyMenus", "Monday"));
+            if (!checkDoc.exists()) {
+                console.log("Initializing Menu in Firestore...");
+                for (const day of DAYS) {
+                    if (initialWeeklyMenu[day]) {
+                        await setDoc(doc(db, "dailyMenus", day), initialWeeklyMenu[day]);
+                    }
                 }
             }
+        } catch (error) {
+            console.error("Firestore Error (menuService.initialize):", error);
         }
     },
 
