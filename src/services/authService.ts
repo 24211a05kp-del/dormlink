@@ -26,6 +26,9 @@ export const authService = {
             throw new Error("Authentication failed: User state not available.");
         }
 
+        // Defensive Delay: Sometimes Firestore needs a moment to recognize the new Auth token
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         let profile;
         try {
             // Document ID must exactly match Auth UID
@@ -33,16 +36,19 @@ export const authService = {
         } catch (error: any) {
             console.error("Auth Flow: Error fetching profile during login:", error.message);
             await firebaseSignOut(auth);
-            throw new Error("Failed to access user data. Please check your connection.");
+            // Include actual Firestore error for diagnostics
+            throw new Error(`Failed to access user data: ${error.message}. Please check your connection.`);
         }
 
         if (!profile) {
+            console.warn(`Auth Flow: Profile document missing at users/${currentUid}`);
             await firebaseSignOut(auth);
-            // Requirement: "User profile not found"
+            // Requirement from user: "User profile not found"
             throw new Error("User profile not found");
         }
 
         if (profile.role !== role) {
+            console.warn(`Auth Flow: Role mismatch. Found ${profile.role}, expected ${role}`);
             await firebaseSignOut(auth);
             const roleError = role === "student"
                 ? "Unauthorized role for student login."
@@ -59,14 +65,24 @@ export const authService = {
     },
 
     signup: async (email: string, pass: string, name: string, role: "student" | "faculty"): Promise<AppUser> => {
+        console.log(`Auth Flow: Starting signup for ${email} as ${role}`);
         const result = await createUserWithEmailAndPassword(auth, email, pass);
         if (result.user) {
+            console.log("Auth Flow: Auth account created, UID:", result.user.uid);
             await updateProfile(result.user, { displayName: name });
-            await userService.createUserProfile(result.user.uid, {
-                name,
-                email,
-                role
-            });
+
+            try {
+                console.log(`Auth Flow: Creating Firestore profile at users/${result.user.uid}`);
+                await userService.createUserProfile(result.user.uid, {
+                    name,
+                    email,
+                    role
+                });
+                console.log("Auth Flow: Firestore profile created successfully");
+            } catch (error: any) {
+                console.error("Auth Flow: Failed to create Firestore profile:", error.message);
+                throw new Error(`Signup succeeded but profile creation failed: ${error.message}`);
+            }
         }
         return {
             uid: result.user.uid,
