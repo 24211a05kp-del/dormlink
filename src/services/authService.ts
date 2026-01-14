@@ -19,14 +19,17 @@ export const authService = {
         const result = await signInWithEmailAndPassword(auth, email, pass);
 
         // Ensure auth state is ready
+        console.log("Auth: Current User UID:", auth.currentUser?.uid);
         if (!auth.currentUser) {
+            console.error("Auth: No current user after login!");
             throw new Error("Authentication failed: User state not available. Please try again.");
         }
 
         let profile;
         try {
             profile = await userService.getUserProfile(result.user.uid);
-        } catch (error) {
+        } catch (error: any) {
+            console.error("Auth: Error fetching profile during login:", error.message);
             await firebaseSignOut(auth);
             throw new Error("Failed to access user data. Please check your connection and try again.");
         }

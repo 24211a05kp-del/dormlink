@@ -28,15 +28,23 @@ export const userService = {
     },
 
     getUserProfile: async (uid: string): Promise<UserProfile | null> => {
+        const path = `users/${uid}`;
+        console.log(`Firestore: Fetching document from ${path}`);
         try {
             const docRef = doc(db, "users", uid);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
+                console.log(`Firestore: Document found at ${path}`);
                 return docSnap.data() as UserProfile;
             }
+            console.warn(`Firestore: No document found at ${path}`);
             return null;
-        } catch (error) {
-            console.error("Firestore Error (getUserProfile):", error);
+        } catch (error: any) {
+            console.error(`Firestore Error (getUserProfile) at ${path}:`, {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
+            });
             throw error;
         }
     },
