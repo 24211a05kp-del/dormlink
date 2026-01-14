@@ -18,32 +18,29 @@ export const authService = {
     login: async (email: string, pass: string, role: "student" | "faculty"): Promise<AppUser> => {
         const result = await signInWithEmailAndPassword(auth, email, pass);
 
-        // Use auth.currentUser.uid as the source of truth for Firestore mapping
-        const currentUid = auth.currentUser?.uid;
-        console.log("Auth Flow: Authenticated UID:", currentUid);
+        // Ensure auth state is fully recognized before proceeding
+        const currentUid = result.user.uid;
+        const profilePath = `users/${currentUid}`;
 
-        if (!currentUid) {
-            throw new Error("Authentication failed: User state not available.");
-        }
+        // MANDATORY LOGS
+        console.log("Auth UID:", currentUid);
+        console.log("Firestore Path:", profilePath);
 
-        // Defensive Delay: Sometimes Firestore needs a moment to recognize the new Auth token
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait for auth to propagate to Firestore
+        await new Promise(resolve => setTimeout(resolve, 800));
 
         let profile;
         try {
-            // Document ID must exactly match Auth UID
             profile = await userService.getUserProfile(currentUid);
         } catch (error: any) {
-            console.error("Auth Flow: Error fetching profile during login:", error.message);
+            console.error("Firestore access error:", error);
             await firebaseSignOut(auth);
-            // Include actual Firestore error for diagnostics
-            throw new Error(`Failed to access user data: ${error.message}. Please check your connection.`);
+            // Catch actual error and provide descriptive message, preventing false 'offline' label
+            throw new Error(`Failed to access user data: ${error.message}`);
         }
 
         if (!profile) {
-            console.warn(`Auth Flow: Profile document missing at users/${currentUid}`);
             await firebaseSignOut(auth);
-            // Requirement from user: "User profile not found"
             throw new Error("User profile not found");
         }
 

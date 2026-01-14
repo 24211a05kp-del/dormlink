@@ -24,6 +24,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 // If we already have a user in state from login/signup call, don't overwrite it with null
                 // until we try to fetch the profile.
                 try {
+                    const profilePath = `users/${firebaseUser.uid}`;
+                    console.log("AuthContext: Fetching profile for UID:", firebaseUser.uid);
+                    console.log("AuthContext: Firestore Path:", profilePath);
+
                     const profile = await userService.getUserProfile(firebaseUser.uid);
                     if (profile) {
                         setUser({
@@ -33,15 +37,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             role: profile.role
                         });
                     } else {
-                        // If no profile found in Firestore, we check if we are in the middle of a login/signup
-                        // that might be creating it. If 'user' is already set, we keep it.
-                        setUser(prev => {
-                            if (prev && prev.uid === firebaseUser.uid) return prev;
-                            return null;
-                        });
+                        // Keep current user state if already set correctly (middle of login)
+                        setUser(prev => (prev && prev.uid === firebaseUser.uid) ? prev : null);
                     }
-                } catch (error) {
-                    console.error("Error fetching user profile:", error);
+                } catch (error: any) {
+                    console.error("AuthContext: Profile fetch error:", error);
                     setUser(null);
                 }
             } else {

@@ -12,19 +12,8 @@ const firebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Runtime validation and logging
-console.log("Firebase Env Check:", {
-    hasApiKey: !!firebaseConfig.apiKey,
-    projectId: firebaseConfig.projectId,
-    appId: !!firebaseConfig.appId
-});
-
-if (!firebaseConfig.apiKey) {
-    console.error("VITE_FIREBASE_API_KEY is missing! Check your .env file or deployment settings.");
-}
-
-// Initialize Firebase only once
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+// Use the getApps() guard to prevent multiple initializations
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
