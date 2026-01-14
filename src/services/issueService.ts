@@ -1,5 +1,5 @@
 import { db } from "../firebase/config";
-import { collection, addDoc, query, onSnapshot, updateDoc, doc, serverTimestamp, orderBy } from "firebase/firestore";
+import { collection, addDoc, query, onSnapshot, updateDoc, doc, serverTimestamp, orderBy, where } from "firebase/firestore";
 
 export interface Issue {
     id: string;
@@ -16,6 +16,8 @@ export interface Issue {
     adminRemarks?: string;
     statusUpdatedBy?: string;
     statusUpdatedAt?: any;
+    isActive?: boolean;
+    resolvedAt?: any;
 }
 
 export const issueService = {
@@ -23,13 +25,18 @@ export const issueService = {
         const docRef = await addDoc(collection(db, "reported_issues"), {
             ...data,
             status: 'open',
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            isActive: true
         });
         return docRef.id;
     },
 
     subscribeToIssues: (callback: (issues: Issue[]) => void) => {
-        const q = query(collection(db, "reported_issues"), orderBy("createdAt", "desc"));
+        const q = query(
+            collection(db, "reported_issues"),
+            where("isActive", "==", true),
+            orderBy("createdAt", "desc")
+        );
         return onSnapshot(q, (snapshot) => {
             const issues = snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -40,11 +47,18 @@ export const issueService = {
     },
 
     updateStatus: async (id: string, status: Issue['status'], facultyId: string) => {
-        await updateDoc(doc(db, "reported_issues", id), {
+        const updates: any = {
             status,
             statusUpdatedBy: facultyId,
             statusUpdatedAt: serverTimestamp()
-        });
+        };
+
+        if (status === 'resolved') {
+            updates.isActive = false;
+            updates.resolvedAt = serverTimestamp();
+        }
+
+        await updateDoc(doc(db, "reported_issues", id), updates);
     },
 
     addRemark: async (id: string, adminRemarks: string) => {

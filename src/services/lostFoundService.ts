@@ -14,7 +14,10 @@ import {
 export interface LostItem {
     id?: string;
     uid: string;
-    studentName: string;
+    studentName: string; // The person reporting/contact person
+    blockName: string;
+    yearOfStudy: string;
+    collegeEmail?: string;
     title: string;
     description: string;
     location: string;
@@ -28,7 +31,10 @@ export interface LostItem {
 export interface FoundItem {
     id?: string;
     uid: string;
-    studentName: string;
+    studentName: string; // The person reporting/contact person
+    blockName: string;
+    yearOfStudy: string;
+    collegeEmail?: string;
     title: string;
     description: string;
     location: string;

@@ -7,6 +7,9 @@ import { FeedbackAnalytics } from "../components/dashboard/FeedbackAnalytics";
 import { MenuManagement } from "../components/dashboard/MenuManagement";
 import { RequestManagement } from "../components/dashboard/RequestManagement";
 import { MoodAnalytics } from "../components/dashboard/MoodAnalytics";
+import { SettingsManagement } from "../components/dashboard/SettingsManagement";
+import { EventManagement } from "../components/dashboard/EventManagement";
+import { EventsBoard } from "../components/dashboard/EventsBoard";
 
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '@/firebase/config';
@@ -33,11 +36,10 @@ export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
 
         // Pending Outings
         const unsubOutings = onSnapshot(
-            collection(db, "outing_requests"),
+            query(collection(db, "outing_requests"), where("status", "in", ["pending", "approved"])),
             (snap) => {
                 const pendingCount = snap.docs.filter(d =>
-                    d.data().status === 'requested' ||
-                    d.data().status === 'guardian_approved'
+                    d.data().status === 'pending'
                 ).length;
                 setStats(prev => prev.map(s => s.label === "Pending Outings" ? { ...s, value: pendingCount.toString() } : s));
             }
@@ -47,7 +49,7 @@ export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
 
         // Pending Issues
         const unsubIssues = onSnapshot(
-            query(collection(db, "issues"), where("status", "==", "Pending")),
+            query(collection(db, "reported_issues"), where("status", "==", "open"), where("isActive", "==", true)),
             (snap) => {
                 setStats(prev => prev.map(s => s.label === "Pending Issues" ? { ...s, value: snap.size.toString() } : s));
             }
@@ -97,6 +99,14 @@ export const FacultyDashboard = ({ userName, onLogout }: DashboardProps) => {
             </div>
 
             <div className="space-y-12">
+                <section>
+                    <SettingsManagement />
+                </section>
+
+                <section>
+                    <EventManagement />
+                </section>
+
                 <section>
                     <RequestManagement />
                 </section>

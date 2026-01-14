@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
-import { Utensils } from 'lucide-react';
+import { Utensils, MessageSquare } from 'lucide-react';
+import { Textarea } from '../ui/textarea';
 import { feedbackService } from '@/services/feedbackService';
 import { useAuth } from '@/context/AuthContext';
 
@@ -19,6 +20,7 @@ export function FeedbackModule() {
     const { user } = useAuth();
     const [selectedMeal, setSelectedMeal] = useState('Lunch');
     const [selectedRating, setSelectedRating] = useState<number | null>(null);
+    const [comment, setComment] = useState('');
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -30,11 +32,13 @@ export function FeedbackModule() {
             await feedbackService.submitFeedback({
                 meal: selectedMeal,
                 rating: selectedRating,
+                comment: comment.trim(),
                 studentName: user?.displayName || 'Anonymous',
                 studentId: user?.uid
             } as any);
             setSubmitted(true);
             setSelectedRating(null);
+            setComment('');
             setTimeout(() => setSubmitted(false), 3000);
         } catch (error) {
             console.error("Failed to submit feedback", error);
@@ -95,12 +99,30 @@ export function FeedbackModule() {
                 </div>
             </div>
 
+            {/* Optional Comment */}
+            <div className="mb-6">
+                <label className="flex items-center gap-2 mb-3 text-sm font-semibold text-secondary">
+                    <MessageSquare className="h-4 w-4" />
+                    Additional Feedback (Optional)
+                </label>
+                <Textarea
+                    placeholder="Tell us more about the food..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    className="rounded-xl border-[#EADFCC] focus:ring-primary/20 bg-[#F5EFE6]/30"
+                    rows={2}
+                />
+            </div>
+
             {/* Submit & Clear Buttons */}
             <div className="flex gap-3">
                 <Button
-                    onClick={() => setSelectedRating(null)}
+                    onClick={() => {
+                        setSelectedRating(null);
+                        setComment('');
+                    }}
                     variant="outline"
-                    disabled={!selectedRating}
+                    disabled={!selectedRating && !comment}
                     className="flex-1 rounded-xl py-6 border-border hover:bg-muted text-secondary font-semibold"
                 >
                     Clear

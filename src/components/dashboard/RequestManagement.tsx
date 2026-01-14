@@ -68,21 +68,23 @@ export function RequestManagement() {
                                             <h4 className="font-bold text-[#5A3A1E] text-lg">{request.studentName}</h4>
                                             <div className="flex gap-2 mt-1">
                                                 <Badge className={
-                                                    request.status === 'requested' ? 'bg-orange-100 text-orange-700' :
-                                                        request.status === 'guardian_approved' ? 'bg-blue-100 text-blue-700' :
-                                                            request.status === 'faculty_approved' || request.status === 'qr_generated' || request.status === 'exited' ? 'bg-green-100 text-green-700' :
-                                                                request.status === 're_entered' ? 'bg-gray-100 text-gray-700' :
-                                                                    'bg-red-100 text-red-700'
+                                                    request.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                                                        request.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                                            request.status === 'completed' ? 'bg-gray-100 text-gray-600' :
+                                                                'bg-red-100 text-red-700'
                                                 }>
-                                                    {request.status === 'requested' ? 'AWAITING GUARDIAN APPROVAL' :
-                                                        request.status === 'guardian_approved' ? 'FACULTY VIEW' :
-                                                            request.status === 'faculty_approved' || request.status === 'qr_generated' || request.status === 'exited' ? 'ACTIVE' :
-                                                                request.status === 're_entered' ? 'COMPLETED' :
-                                                                    request.status.replace('_', ' ').toUpperCase()}
+                                                    {request.status === 'pending' ? (request.guardianApprovalStatus === 'approved' ? 'FACULTY VIEW' : 'AWAITING GUARDIAN APPROVAL') :
+                                                        request.status === 'approved' ? 'ACTIVE & AUTHORIZED' :
+                                                            request.status === 'completed' ? 'COMPLETED' :
+                                                                request.status.replace('_', ' ').toUpperCase()}
                                                 </Badge>
                                                 {request.guardianApprovalStatus === 'approved' && (
                                                     <Badge variant="outline" className="border-green-200 text-green-600">GUARDIAN ✓</Badge>
                                                 )}
+                                                {request.status === 'approved' && request.exitScanAt &&
+                                                    new Date(request.arrivalDate) < new Date(new Date().setHours(0, 0, 0, 0)) && (
+                                                        <Badge className="bg-red-600 text-white animate-pulse">OVERDUE</Badge>
+                                                    )}
                                             </div>
                                         </div>
                                     </div>
@@ -92,7 +94,7 @@ export function RequestManagement() {
                                             <p className="text-[10px] font-black text-[#8A6A4F] uppercase tracking-widest">Selected Guardian</p>
                                             <p className="font-bold text-[#5A3A1E]">{request.selectedGuardian?.name}</p>
                                             <p className="text-xs text-[#7A5C3A]">{request.selectedGuardian?.relation} • {request.selectedGuardian?.phone}</p>
-                                            {request.status === 'requested' && request.guardianApprovalToken && (
+                                            {request.status === 'pending' && request.guardianApprovalStatus === 'pending' && request.guardianApprovalToken && (
                                                 <div className="mt-2 flex flex-col gap-1">
                                                     <p className="text-[8px] font-bold text-orange-600 uppercase">Approval Link (Copy)</p>
                                                     <div className="flex gap-1">
@@ -131,7 +133,7 @@ export function RequestManagement() {
                                 </div>
 
                                 <div className="flex flex-col gap-2 shrink-0 min-w-[200px]">
-                                    {request.status === 'guardian_approved' && (
+                                    {request.status === 'pending' && request.guardianApprovalStatus === 'approved' && (
                                         <>
                                             <Button onClick={() => handleAction(request.id!, 'approved')} className="bg-green-600 hover:bg-green-700 text-white rounded-xl h-12">
                                                 <CheckCircle className="h-4 w-4 mr-2" />
@@ -144,21 +146,35 @@ export function RequestManagement() {
                                         </>
                                     )}
 
-                                    {(request.status === 'qr_generated' || request.status === 'faculty_approved') && (
-                                        <Button onClick={() => handleScan(request.id!, 'exit')} className="bg-primary hover:bg-primary/90 rounded-xl h-12 shadow-lg">
-                                            <MapPin className="h-4 w-4 mr-2" />
-                                            Simulate Exit Scan
-                                        </Button>
+                                    {request.status === 'approved' && (
+                                        <div className="flex flex-col gap-2">
+                                            {!request.exitScanAt ? (
+                                                <Button onClick={() => handleScan(request.id!, 'exit')} className="bg-primary hover:bg-primary/90 rounded-xl h-12 shadow-lg">
+                                                    <MapPin className="h-4 w-4 mr-2" />
+                                                    Simulate Exit Scan
+                                                </Button>
+                                            ) : (
+                                                <>
+                                                    <Button onClick={() => handleScan(request.id!, 'entry')} className="bg-primary hover:bg-primary/90 rounded-xl h-12 shadow-lg w-full">
+                                                        <MapPin className="h-4 w-4 mr-2" />
+                                                        Simulate Entry Scan
+                                                    </Button>
+                                                    {new Date(request.arrivalDate) < new Date(new Date().setHours(0, 0, 0, 0)) && (
+                                                        <a
+                                                            href={`https://mail.google.com/mail/?view=cm&fs=1&to=${request.studentEmail}&su=${encodeURIComponent(`Late Return Notice: ${request.studentName}`)}&body=${encodeURIComponent(`Dear ${request.studentName},\n\nOur records show that you were expected to return from your outing on ${request.arrivalDate}.\n\nAccording to campus regulations, you are currently OVERDUE. Please report to the warden office immediately or provide an explanation for your delay by replying to this email.\n\nSummary: ${request.summarizedReason}\n\nRegards,\nWarden Office`)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="w-full py-3 px-4 bg-red-100 text-red-700 rounded-xl text-center text-xs font-bold border border-red-200 hover:bg-red-200 transition-colors"
+                                                        >
+                                                            Email Overdue Student
+                                                        </a>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     )}
 
-                                    {request.status === 'exited' && (
-                                        <Button onClick={() => handleScan(request.id!, 'entry')} className="bg-primary hover:bg-primary/90 rounded-xl h-12 shadow-lg">
-                                            <MapPin className="h-4 w-4 mr-2" />
-                                            Simulate Entry Scan
-                                        </Button>
-                                    )}
-
-                                    {request.status === 're_entered' && (
+                                    {request.status === 'completed' && (
                                         <Badge className="h-12 bg-gray-100 text-gray-600 border border-gray-200 flex items-center justify-center rounded-xl">
                                             COMPLETED
                                         </Badge>

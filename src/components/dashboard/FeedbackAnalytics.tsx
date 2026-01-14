@@ -9,7 +9,12 @@ export function FeedbackAnalytics() {
     const [stats, setStats] = useState({
         averageRating: 0,
         totalFeedback: 0,
-        distribution: [] as any[],
+        mealDistributions: {
+            'Breakfast': [] as any[],
+            'Lunch': [] as any[],
+            'Snacks': [] as any[],
+            'Dinner': [] as any[]
+        },
         loading: true
     });
 
@@ -26,34 +31,47 @@ export function FeedbackAnalytics() {
             const total = feedbacks.length;
             const avg = feedbacks.reduce((acc, curr) => acc + (curr.rating || 0), 0) / total;
 
-            const distMap = {
-                'Excellent': 0,
-                'Good': 0,
-                'Average': 0,
-                'Below Avg': 0,
-                'Poor': 0
+            const mealDistributions: any = {
+                'Breakfast': { Excellent: 0, Good: 0, Average: 0, 'Below Avg': 0, Poor: 0 },
+                'Lunch': { Excellent: 0, Good: 0, Average: 0, 'Below Avg': 0, Poor: 0 },
+                'Snacks': { Excellent: 0, Good: 0, Average: 0, 'Below Avg': 0, Poor: 0 },
+                'Dinner': { Excellent: 0, Good: 0, Average: 0, 'Below Avg': 0, Poor: 0 }
             };
 
             feedbacks.forEach(f => {
-                if (f.rating === 5) distMap['Excellent']++;
-                else if (f.rating === 4) distMap['Good']++;
-                else if (f.rating === 3) distMap['Average']++;
-                else if (f.rating === 2) distMap['Below Avg']++;
-                else if (f.rating === 1) distMap['Poor']++;
+                const meal = f.meal || 'Lunch'; // Fallback
+                if (!mealDistributions[meal]) return;
+
+                if (f.rating === 5) mealDistributions[meal]['Excellent']++;
+                else if (f.rating === 4) mealDistributions[meal]['Good']++;
+                else if (f.rating === 3) mealDistributions[meal]['Average']++;
+                else if (f.rating === 2) mealDistributions[meal]['Below Avg']++;
+                else if (f.rating === 1) mealDistributions[meal]['Poor']++;
             });
 
-            const distribution = [
-                { name: 'Excellent', value: distMap['Excellent'], color: '#5B8C5A' },
-                { name: 'Good', value: distMap['Good'], color: '#C4A77D' },
-                { name: 'Average', value: distMap['Average'], color: '#D97706' },
-                { name: 'Below Avg', value: distMap['Below Avg'], color: '#C44536' },
-                { name: 'Poor', value: distMap['Poor'], color: '#7A5C3D' }
-            ].filter(d => d.value > 0);
+            const colors: any = {
+                'Excellent': '#5B8C5A',
+                'Good': '#C4A77D',
+                'Average': '#D97706',
+                'Below Avg': '#C44536',
+                'Poor': '#7A5C3D'
+            };
+
+            const finalizedDistributions: any = {};
+            ['Breakfast', 'Lunch', 'Snacks', 'Dinner'].forEach(meal => {
+                finalizedDistributions[meal] = Object.entries(mealDistributions[meal])
+                    .map(([name, value]) => ({
+                        name,
+                        value,
+                        color: colors[name]
+                    }))
+                    .filter(d => (d.value as number) > 0);
+            });
 
             setStats({
                 averageRating: Number(avg.toFixed(1)),
                 totalFeedback: total,
-                distribution,
+                mealDistributions: finalizedDistributions,
                 loading: false
             });
         });
@@ -100,33 +118,50 @@ export function FeedbackAnalytics() {
 
             <div className="grid gap-6">
                 <Card className="p-6 shadow-sm border-[#EADFCC]">
-                    <h3 className="mb-6 text-[#5A3A1E] font-bold">Rating Distribution</h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={stats.distribution.length > 0 ? stats.distribution : [{ name: 'No Data', value: 1, color: '#EADFCC' }]}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                                    outerRadius={100}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {stats.distribution.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: '#FEFBF6',
-                                        border: '1px solid #EADFCC',
-                                        borderRadius: '1rem'
-                                    }}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
+                    <h3 className="mb-6 text-[#5A3A1E] font-bold">Meal-Wise Satisfaction</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {['Breakfast', 'Lunch', 'Snacks', 'Dinner'].map((meal) => {
+                            const data = stats.mealDistributions[meal as keyof typeof stats.mealDistributions];
+                            const hasData = data && data.length > 0;
+
+                            return (
+                                <div key={meal} className="flex flex-col items-center">
+                                    <div className="h-[200px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={hasData ? data : [{ name: 'No Data', value: 1, color: '#EADFCC' }]}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={40}
+                                                    outerRadius={60}
+                                                    paddingAngle={5}
+                                                    dataKey="value"
+                                                >
+                                                    {hasData ? data.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    )) : (
+                                                        <Cell fill="#F5EFE6" />
+                                                    )}
+                                                </Pie>
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: '#FEFBF6',
+                                                        border: '1px solid #EADFCC',
+                                                        borderRadius: '0.5rem',
+                                                        fontSize: '10px'
+                                                    }}
+                                                />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="font-bold text-[#5A3A1E] text-sm">{meal}</p>
+                                        {!hasData && <p className="text-[10px] text-[#7A5C3A] italic">No ratings yet</p>}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </Card>
             </div>

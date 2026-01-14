@@ -9,6 +9,7 @@ import { Textarea } from '../ui/textarea';
 import { useAuth } from '@/context/AuthContext';
 import { outingService, OutingRequest } from '@/services/outingService';
 import { userService, Guardian } from '@/services/userService';
+import { settingsService, AppSettings } from '@/services/settingsService';
 import { aiService } from '@/utils/ai';
 import { toast } from 'sonner';
 
@@ -19,6 +20,7 @@ export function OutingApproval() {
     const [activeRequest, setActiveRequest] = useState<OutingRequest | null>(null);
     const [loading, setLoading] = useState(false);
     const [isAddingGuardian, setIsAddingGuardian] = useState(false);
+    const [maxGuardians, setMaxGuardians] = useState(3); // Default to 3
 
     // New Guardian Form
     const [newGuardian, setNewGuardian] = useState<Guardian>({ name: '', relation: '', phone: '', email: '' });
@@ -42,8 +44,8 @@ export function OutingApproval() {
         };
         fetchProfile();
 
-        const unsubscribe = outingService.subscribeToUserOutings(user.uid, (outings) => {
-            const ongoing = outings.find(o => o.status !== 're_entered' && o.status !== 'rejected');
+        const unsubscribeOutings = outingService.subscribeToUserOutings(user.uid, (outings) => {
+            const ongoing = outings.find(o => o.status !== 'completed' && o.status !== 'rejected');
             setActiveRequest(ongoing || null);
 
             if (ongoing) {
@@ -54,7 +56,6 @@ export function OutingApproval() {
                 setReason(ongoing.fullReason);
                 if (ongoing.selectedGuardian) setSelectedGuardian(ongoing.selectedGuardian);
             } else {
-                // Reset form if no active request (e.g. after cancellation or completion)
                 setDepartureDate('');
                 setDepartureTime('');
                 setArrivalDate('');
@@ -64,7 +65,14 @@ export function OutingApproval() {
             }
         });
 
-        return () => unsubscribe();
+        const unsubscribeSettings = settingsService.subscribeToSettings((data) => {
+            setMaxGuardians(data.maxGuardians);
+        });
+
+        return () => {
+            unsubscribeOutings();
+            unsubscribeSettings();
+        };
     }, [user]);
 
     const handleAddGuardian = async () => {
@@ -98,6 +106,7 @@ export function OutingApproval() {
     };
 
     const handleRequestPass = async () => {
+        if (!user) return;
         if (!departureDate || !departureTime || !arrivalDate || !arrivalTime || !reason) {
             alert("Please fill all date, time, and reason fields");
             return;
@@ -116,6 +125,7 @@ export function OutingApproval() {
             await outingService.requestOuting({
                 uid: user.uid,
                 studentName: user.displayName || 'Unknown',
+                studentEmail: user.email || '',
                 departureDate,
                 departureTime,
                 arrivalDate,
@@ -136,6 +146,10 @@ export function OutingApproval() {
 
     const isFormValid = selectedGuardian && departureTime && arrivalDate && arrivalTime && reason;
     const status = activeRequest?.status || 'idle';
+
+    const isOverdue = activeRequest?.exitScanAt &&
+        activeRequest.arrivalDate &&
+        new Date(activeRequest.arrivalDate) < new Date(new Date().setHours(0, 0, 0, 0));
 
     // Fallback link generation if missing in DB
     const approvalLink = activeRequest?.guardianApprovalLink ||
@@ -159,7 +173,7 @@ export function OutingApproval() {
             <div className="mb-8 p-6 bg-[#F5EFE6]/50 rounded-2xl border border-[#EADFCC]">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-[#5A3A1E]">
-                        Your Guardians (Max 5)
+                        Your Guardians (Max {maxGuardians})
                     </h3>
                 </div>
 
@@ -193,7 +207,7 @@ export function OutingApproval() {
                         </div>
                     ))}
 
-                    {userGuardians.length < 5 && !isAddingGuardian && (
+                    {userGuardians.length < maxGuardians && !isAddingGuardian && (
                         <button
                             onClick={() => setIsAddingGuardian(true)}
                             className="w-full p-4 rounded-xl border-2 border-dashed border-[#EADFCC] bg-white hover:bg-[#F5EFE6] transition-all flex flex-col items-center justify-center gap-2 group min-h-[100px]"
@@ -316,21 +330,19 @@ export function OutingApproval() {
                 <div className="mb-8 p-6 bg-[#F5EFE6] rounded-3xl border-2 border-[#EADFCC]">
                     <div className="flex items-center justify-between mb-6">
                         <span className="text-sm font-bold text-[#5A3A1E]">Live Status</span>
-                        <Badge className={`px-4 py-1.5 rounded-full ${status === 'requested' ? 'bg-orange-100 text-orange-700' :
-                            status === 'guardian_approved' ? 'bg-blue-100 text-blue-700' :
-                                status === 'faculty_approved' || status === 'qr_generated' || status === 'exited' ? 'bg-green-100 text-green-700' :
-                                    status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                        'bg-gray-100 text-gray-700'
+                        <Badge className={`px-4 py-1.5 rounded-full ${status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                            status === 'approved' ? 'bg-green-100 text-green-700' :
+                                status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                    'bg-gray-100 text-gray-700'
                             }`}>
-                            {status === 'requested' ? 'AWAITING GUARDIAN APPROVAL' :
-                                status === 'guardian_approved' ? 'FACULTY VIEW' :
-                                    status === 'qr_generated' || status === 'faculty_approved' || status === 'exited' ? 'ACTIVE' :
-                                        status === 'rejected' ? 'REJECTED' :
-                                            status === 're_entered' ? 'COMPLETED' : status}
+                            {status === 'pending' ? (activeRequest?.guardianApprovalStatus === 'approved' ? 'FACULTY VIEW' : 'AWAITING GUARDIAN APPROVAL') :
+                                status === 'approved' ? 'ACTIVE & AUTHORIZED' :
+                                    status === 'rejected' ? 'REJECTED' :
+                                        status === 'completed' ? 'COMPLETED' : status}
                         </Badge>
                     </div>
 
-                    {status === 'requested' && (
+                    {status === 'pending' && activeRequest?.guardianApprovalStatus === 'pending' && (
                         <div className="space-y-4">
                             <div className="flex items-start gap-3 p-4 bg-white/60 rounded-2xl border border-orange-200">
                                 <Clock className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
@@ -373,7 +385,7 @@ export function OutingApproval() {
                         </div>
                     )}
 
-                    {status === 'guardian_approved' && (
+                    {status === 'pending' && activeRequest?.guardianApprovalStatus === 'approved' && (
                         <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-200">
                             <CheckCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
                             <div>
@@ -383,7 +395,7 @@ export function OutingApproval() {
                         </div>
                     )}
 
-                    {(status === 'qr_generated' || status === 'faculty_approved' || status === 'exited') && (
+                    {status === 'approved' && (
                         <div className="mt-8 perspective-1000">
                             <div className="relative overflow-hidden bg-white rounded-3xl shadow-2xl border border-gray-100 animate-in zoom-in-50 duration-500 ease-out">
                                 {/* Header Branding */}
@@ -430,13 +442,20 @@ export function OutingApproval() {
                                     </div>
 
                                     {/* Status Footer */}
-                                    <div className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold text-sm tracking-wide ${status === 'exited' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                                    <div className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold text-sm tracking-wide ${activeRequest?.exitScanAt ? (isOverdue ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700') : 'bg-green-100 text-green-700'
                                         }`}>
-                                        {status === 'exited' ? (
-                                            <>
-                                                <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                                                OUT OF CAMPUS
-                                            </>
+                                        {activeRequest?.exitScanAt ? (
+                                            isOverdue ? (
+                                                <>
+                                                    <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+                                                    OVERDUE - PLEASE REPORT
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                                                    OUT OF CAMPUS
+                                                </>
+                                            )
                                         ) : (
                                             <>
                                                 <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
@@ -445,13 +464,24 @@ export function OutingApproval() {
                                         )}
                                     </div>
 
+                                    {isOverdue && (
+                                        <a
+                                            href={`https://mail.google.com/mail/?view=cm&fs=1&to=warden@college.edu&su=${encodeURIComponent(`Late Return Explanation: ${activeRequest?.studentName}`)}&body=${encodeURIComponent(`Dear Warden,\n\nI am reporting that I have exceeded my return date for the outing "${activeRequest?.summarizedReason}".\n\n[Reason for Delay]:\n(Please explain here...)\n\nExpected Return was: ${activeRequest?.arrivalDate}\n\nRegards,\n${activeRequest?.studentName}`)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="w-full mt-2 py-2 px-4 bg-red-600 text-white rounded-xl text-center text-xs font-bold shadow-lg hover:bg-red-700 transition-colors"
+                                        >
+                                            Contact Warden Regarding Delay
+                                        </a>
+                                    )}
+
                                     <p className="text-[10px] text-center text-gray-400 font-mono break-all max-w-[80%]">
                                         ID: {activeRequest?.qrData}
                                     </p>
 
                                     {/* Gate Simulation Buttons for Testing/Demo Flow */}
                                     <div className="flex gap-2 w-full pt-4 border-t border-dashed border-gray-200">
-                                        {(status === 'faculty_approved' || status === 'qr_generated') && (
+                                        {!activeRequest?.exitScanAt && (
                                             <Button
                                                 onClick={async () => {
                                                     if (!activeRequest?.id) return;
@@ -470,7 +500,7 @@ export function OutingApproval() {
                                                 📍 Simulate Gate Exit
                                             </Button>
                                         )}
-                                        {status === 'exited' && (
+                                        {activeRequest?.exitScanAt && (
                                             <Button
                                                 onClick={async () => {
                                                     if (!activeRequest?.id) return;
@@ -478,7 +508,7 @@ export function OutingApproval() {
                                                     try {
                                                         await outingService.recordScan(activeRequest.id, 'entry');
                                                         toast.success("Return Scanned - Outing Complete");
-                                                        // This will switch status to 're_entered', 
+                                                        // This will switch status to 'completed', 
                                                         // which removes it from 'ongoing' and resets the form.
                                                     } catch (e) {
                                                         toast.error("Scan Failed");

@@ -6,7 +6,7 @@ import { MoodBoard } from '../components/dashboard/MoodBoard';
 import { OutingApproval } from '../components/dashboard/OutingApproval';
 
 import { LostAndFound } from '../components/dashboard/LostAndFound';
-import { EventsAndClubs } from '../components/dashboard/EventsAndClubs';
+import { EventsBoard } from '../components/dashboard/EventsBoard';
 import { MenuScreen } from '../components/dashboard/MenuScreen';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
 import { IssuesModule } from '../components/dashboard/IssuesModule';
@@ -110,7 +110,7 @@ export function StudentDashboard({ userName, onLogout }: StudentDashboardProps) 
                     )}
 
                     {activeTab === 'events' && (
-                        <EventsAndClubs />
+                        <EventsBoard />
                     )}
 
                     {activeTab === 'menu' && (

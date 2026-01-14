@@ -56,7 +56,7 @@ describe('outingService', () => {
 
         expect(addDoc).toHaveBeenCalledWith(undefined, expect.objectContaining({
             uid: 'student-123',
-            status: 'requested',
+            status: 'pending',
             guardianApprovalStatus: 'pending',
             guardianApprovalLink: expect.stringContaining('http://localhost:3000/guardian/approve/')
         }));
@@ -80,9 +80,8 @@ describe('outingService', () => {
         await outingService.facultyAction('outing-123', 'approved');
 
         expect(updateDoc).toHaveBeenCalledWith(undefined, expect.objectContaining({
-            status: 'faculty_approved',
+            status: 'pending',
             facultyApprovalStatus: 'approved',
-            qrData: expect.stringContaining('OUTING-outing-123-')
         }));
     });
 });

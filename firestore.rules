@@ -36,7 +36,7 @@ service cloud.firestore {
                     (isStudent() && resource.data.uid == request.auth.uid) ||
                     (
                       // Secure Guardian Approval (Public Update)
-                      resource.data.status == 'requested' &&
+                      resource.data.status == 'pending' &&
                       request.resource.data.guardianApprovalStatus in ['approved', 'rejected'] &&
                       // Prevent modification of student data
                       request.resource.data.uid == resource.data.uid &&
@@ -45,7 +45,7 @@ service cloud.firestore {
                       request.resource.data.guardianApprovalToken == null &&
                       // Strict field control
                       request.resource.data.diff(resource.data).affectedKeys()
-                        .hasOnly(['guardianApprovalStatus', 'guardianApprovedAt', 'status', 'guardianApprovalToken'])
+                        .hasOnly(['guardianApprovalStatus', 'guardianApprovedAt', 'status', 'guardianApprovalToken', 'isActive', 'approvedAt'])
                     );
     }
 
@@ -57,6 +57,12 @@ service cloud.firestore {
     }
 
     // Issues (Complaints)
+    match /reported_issues/{issueId} {
+      allow read: if isFaculty() || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if isStudent();
+      allow update: if isFaculty();
+    }
+
     match /issues/{issueId} {
       allow read: if isFaculty() || (isSignedIn() && resource.data.uid == request.auth.uid);
       allow create: if isStudent();

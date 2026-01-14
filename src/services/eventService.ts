@@ -1,33 +1,56 @@
 import { db } from "../firebase/config";
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
+import {
+    collection,
+    addDoc,
+    query,
+    onSnapshot,
+    orderBy,
+    deleteDoc,
+    doc,
+    serverTimestamp,
+    updateDoc
+} from "firebase/firestore";
 
-export interface EventData {
-    id: string;
+export interface CampusEvent {
+    id?: string;
     title: string;
-    date: string; // Display string for now, could be formatted from timestamp
-    time: string;
+    description: string;
+    clubOrDepartment: string;
+    registrationDeadline: string;
+    date: string; // Event date
     location: string;
-    category: string;
-    attendees: number;
-    saved: boolean; // Just a local toggle for now, usually needs user-event mapping
-    color: string;
+    imageUrl?: string;
+    image?: string;
+    organizerId: string;
+    organizerName: string;
+    createdAt: any;
 }
 
 export const eventService = {
-    getEvents: async (): Promise<EventData[]> => {
-        try {
-            // optimized to sort by date if needed, but for now just fetching all
-            const q = query(collection(db, "events"));
-            const querySnapshot = await getDocs(q);
+    createEvent: async (event: Omit<CampusEvent, 'id' | 'createdAt'>) => {
+        const docRef = await addDoc(collection(db, "campus_events"), {
+            ...event,
+            createdAt: serverTimestamp()
+        });
+        return docRef.id;
+    },
 
-            return querySnapshot.docs.map(doc => ({
+    subscribeToEvents: (callback: (events: CampusEvent[]) => void) => {
+        const q = query(collection(db, "campus_events"), orderBy("createdAt", "desc"));
+        return onSnapshot(q, (snapshot) => {
+            const events = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
-            } as EventData));
-        } catch (error) {
-            console.error("Error fetching events: ", error);
-            // Fallback to empty list or throw
-            return [];
-        }
+            } as CampusEvent));
+            callback(events);
+        });
+    },
+
+    deleteEvent: async (id: string) => {
+        await deleteDoc(doc(db, "campus_events", id));
+    },
+
+    updateEvent: async (id: string, data: Partial<CampusEvent>) => {
+        await updateDoc(doc(db, "campus_events", id), data);
     }
 };
