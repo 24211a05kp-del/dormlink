@@ -19,6 +19,7 @@ export interface UserProfile {
 
 export const userService = {
     createUserProfile: async (uid: string, data: Omit<UserProfile, 'uid' | 'createdAt'>) => {
+        // REQUIRED: All user profiles are stored in: users/{uid}
         await setDoc(doc(db, "users", uid), {
             ...data,
             uid,

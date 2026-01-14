@@ -17,22 +17,12 @@ export interface AppUser {
 export const authService = {
     login: async (email: string, pass: string, role: "student" | "faculty"): Promise<AppUser> => {
         const result = await signInWithEmailAndPassword(auth, email, pass);
-        let profile = await userService.getUserProfile(result.user.uid);
+        const profile = await userService.getUserProfile(result.user.uid);
 
         if (!profile) {
-            // Profile missing in Firestore? Create it using Auth info and requested role
-            const name = result.user.displayName || email.split('@')[0];
-            await userService.createUserProfile(result.user.uid, {
-                name,
-                email,
-                role
-            });
-            return {
-                uid: result.user.uid,
-                displayName: name,
-                email: result.user.email,
-                role
-            };
+            // Logout if profile is missing to prevent session persistence without profile
+            await firebaseSignOut(auth);
+            throw new Error("User profile not found. Please contact support or Sign Up.");
         }
 
         if (profile.role !== role) {
